@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "354671670812",
+    "project_id": "temple-procession-walter",
+    "storage_bucket": "temple-procession-walter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:354671670812:android:cf0e37351af74dda2151d9",
+        "android_client_info": {
+          "package_name": "com.walter.templeprocessiontracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSb5okBesPtGf5g_TroIO5QD5EFLW10uY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
