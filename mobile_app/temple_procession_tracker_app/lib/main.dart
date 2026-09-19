@@ -1,6 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+
+import 'features/map/public_map_screen.dart';
 import 'firebase_options.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -8,14 +11,20 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const TempleProcessionTrackerApp());
+  runApp(
+    const TempleProcessionTrackerApp(),
+  );
 }
 
 class TempleProcessionTrackerApp extends StatelessWidget {
-  const TempleProcessionTrackerApp({super.key});
+  const TempleProcessionTrackerApp({
+    super.key,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return MaterialApp(
       title: 'Temple Procession Tracker',
       debugShowCheckedModeBanner: false,
@@ -29,26 +38,37 @@ class TempleProcessionTrackerApp extends StatelessWidget {
 }
 
 class AppEntryScreen extends StatelessWidget {
-  const AppEntryScreen({super.key});
+  const AppEntryScreen({
+    super.key,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Temple Procession Tracker'),
+        title: const Text(
+          'Temple Procession Tracker',
+        ),
       ),
-      body: const Center(
+      body: Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(
+            24,
+          ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment:
+                MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.temple_buddhist,
                 size: 80,
               ),
-              SizedBox(height: 24),
-              Text(
+              const SizedBox(
+                height: 24,
+              ),
+              const Text(
                 'GPS-Based Temple Procession Tracking App',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -56,21 +76,54 @@ class AppEntryScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 16),
-              Text(
+              const SizedBox(
+                height: 16,
+              ),
+              const Text(
                 'Follow temple procession routes, stop points, group locations, and event status in real time.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(
+                  fontSize: 16,
+                ),
               ),
-              SizedBox(height: 32),
+              const SizedBox(
+                height: 32,
+              ),
               FilledButton(
-                onPressed: null,
-                child: Text('Join with Access Code'),
+                onPressed: () {
+                  Navigator.of(
+                    context,
+                  ).push(
+                    MaterialPageRoute<void>(
+                      builder: (
+                        context,
+                      ) {
+                        return const PublicMapScreen();
+                      },
+                    ),
+                  );
+                },
+                child: const Text(
+                  'View Public Map',
+                ),
               ),
-              SizedBox(height: 12),
-              OutlinedButton(
+              const SizedBox(
+                height: 12,
+              ),
+              const FilledButton(
                 onPressed: null,
-                child: Text('Organizer Dashboard'),
+                child: Text(
+                  'Join with Access Code',
+                ),
+              ),
+              const SizedBox(
+                height: 12,
+              ),
+              const OutlinedButton(
+                onPressed: null,
+                child: Text(
+                  'Organizer Dashboard',
+                ),
               ),
             ],
           ),
