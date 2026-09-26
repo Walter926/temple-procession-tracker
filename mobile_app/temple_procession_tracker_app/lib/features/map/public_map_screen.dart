@@ -51,7 +51,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
       appBar: AppBar(
         title: const Text(
           'Public Procession Map',
-        ),
+        ), 
       ),
       body: GoogleMap(
         initialCameraPosition: const CameraPosition(
