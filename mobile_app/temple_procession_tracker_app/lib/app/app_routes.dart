@@ -23,6 +23,9 @@ class AppRoutes {
   static const String publicMap = 'publicMap';
   static const String publicMapPath = '/public-map';
 
+  static const String publicVisitorHome = 'publicVisitorHome';
+  static const String publicVisitorHomePath = '/public-visitor';
+
   static const String groupMap = 'groupMap';
   static const String groupMapPath = '/group-map';
 
@@ -34,6 +37,12 @@ class AppRoutes {
 
   static const String notifications = 'notifications';
   static const String notificationsPath = '/notifications';
+
+  static const String adminEvents = 'adminEvents';
+  static const String adminEventsPath = '/admin/events';
+
+  static const String accessDenied = 'accessDenied';
+  static const String accessDeniedPath = '/access-denied';
 
   const AppRoutes._();
 }

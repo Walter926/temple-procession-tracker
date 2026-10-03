@@ -128,6 +128,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                 child: const Text('Create Account'),
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : () {
+                            context.push(AppRoutes.publicMapPath);
+                          },
+                icon: const Icon(Icons.public),
+                label: const Text('View Public Map'),
+              ),
+              const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: _isLoading ? null : () {
                             context.push(AppRoutes.joinCodePath);

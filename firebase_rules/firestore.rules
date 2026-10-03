@@ -3,120 +3,110 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function userRole() {
+    function currentUserRole() {
       return get(
         /databases/$(database)/documents/users/$(request.auth.uid)
       ).data.role;
     }
 
     function isAdmin() {
-      return signedIn() && userRole() == 'admin';
+      return isSignedIn()
+        && currentUserRole() == 'admin';
     }
 
     function isOrganizer() {
-      return signedIn() &&
-        (
-          userRole() == 'admin' ||
-          userRole() == 'organizer'
-        );
+      return isSignedIn()
+        && currentUserRole() == 'organizer';
     }
 
-    function isTeamLeaderOrHigher() {
-      return signedIn() &&
-        (
-          userRole() == 'admin' ||
-          userRole() == 'organizer' ||
-          userRole() == 'teamLeader'
-        );
+    function isManagement() {
+      return isAdmin() || isOrganizer();
     }
 
     match /users/{userId} {
-      allow create: if signedIn() &&
-        request.auth.uid == userId &&
-        request.resource.data.role == 'viewer';
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'teamMember'
+        && request.resource.data.email == request.auth.token.email;
 
-      allow read: if signedIn() &&
-        (
-          request.auth.uid == userId ||
-          isOrganizer()
+      allow read: if isSignedIn()
+        && (
+          request.auth.uid == userId
+          || isManagement()
         );
 
-      allow update: if signedIn() &&
-        (
-          (
-            request.auth.uid == userId &&
-            request.resource.data.role == resource.data.role
-          ) ||
-          isAdmin()
+      allow update: if isAdmin()
+        || (
+          isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.isActive == resource.data.isActive
+          && request.resource.data.createdAt == resource.data.createdAt
         );
 
       allow delete: if isAdmin();
     }
 
     match /events/{eventId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn()
+        || resource.data.isPublic == true;
+
+      allow create, update, delete: if isManagement();
     }
 
     match /routes/{routeId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /routeSegments/{segmentId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /stopPoints/{stopPointId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /groups/{groupId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /accessCodes/{accessCodeId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /locationUpdates/{locationUpdateId} {
-      allow read: if signedIn();
-
-      allow create: if isTeamLeaderOrHigher() &&
-        request.resource.data.userId == request.auth.uid;
-
-      allow update, delete: if signedIn() &&
-        resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     match /locationHistory/{historyId} {
-      allow read: if signedIn();
-      allow create: if isTeamLeaderOrHigher();
-      allow update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     match /collisionAlerts/{alertId} {
-      allow read: if signedIn();
-      allow create: if isTeamLeaderOrHigher();
-      allow update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /notifications/{notificationId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /routeSuggestions/{suggestionId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isOrganizer();
+      allow read: if isSignedIn();
+      allow create, update, delete: if isManagement();
     }
 
     match /{document=**} {

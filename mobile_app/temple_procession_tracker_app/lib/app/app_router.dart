@@ -1,12 +1,17 @@
 import 'package:go_router/go_router.dart';
 
+import '../core/enums/user_role.dart';
 import '../core/services/auth_service.dart';
+import '../core/utils/role_access.dart';
+import '../features/auth/access_denied_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/join_code_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/registration_screen.dart';
 import '../features/auth/splash_screen.dart';
 import '../features/dashboard/home_screen.dart';
+import '../features/dashboard/public_visitor_home_screen.dart';
+import '../features/events/admin_event_management_screen.dart';
 import '../features/events/event_list_screen.dart';
 import '../features/map/group_map_screen.dart';
 import '../features/map/public_map_screen.dart';
@@ -15,6 +20,7 @@ import '../features/profile/profile_screen.dart';
 import '../features/tracking/team_leader_tracking_screen.dart';
 import 'app_routes.dart';
 import 'auth_state_notifier.dart';
+import 'role_route_guard.dart';
 
 class AppRouter {
   static GoRouter createRouter({required AuthService authService, required AuthStateNotifier authStateNotifier}) {
@@ -24,22 +30,71 @@ class AppRouter {
       redirect: (context, state) {
         final String path = state.uri.path;
         final bool isLoggedIn = authStateNotifier.isAuthenticated;
-
-        final bool isAuthRoute =
-            path == AppRoutes.loginPath ||
-            path == AppRoutes.registrationPath ||
-            path == AppRoutes.forgotPasswordPath;
+        final UserRole? role = authStateNotifier.effectiveRole;
+        final bool isAuthRoute = path == AppRoutes.loginPath || path == AppRoutes.registrationPath || path == AppRoutes.forgotPasswordPath;
 
         if (path == AppRoutes.splashPath) {
-          return isLoggedIn ? AppRoutes.homePath : AppRoutes.loginPath;
-        }
+          if (!isLoggedIn) {
+            return AppRoutes.loginPath;
+          }
 
-        if (!isLoggedIn && _isProtectedPath(path)) {
-          return AppRoutes.loginPath;
-        }
+          if (authStateNotifier.isProfileLoading) {
+            return null;
+          }
 
-        if (isLoggedIn && isAuthRoute) {
+          if (role == UserRole.publicVisitor) {
+            return AppRoutes.publicVisitorHomePath;
+          }
+
+          if (!RoleAccess.canAccessMemberArea(role)) {
+            return AppRoutes.accessDeniedPath;
+          }
+
           return AppRoutes.homePath;
+        }
+
+        if (!isLoggedIn) {
+          if (_isProtectedPath(path) || path == AppRoutes.accessDeniedPath) {
+            return AppRoutes.loginPath;
+          }
+
+          return null;
+        }
+
+        if (authStateNotifier.isProfileLoading) {
+          return null;
+        }
+
+        if (role == UserRole.publicVisitor) {
+          if (path == AppRoutes.publicVisitorHomePath || path == AppRoutes.publicMapPath) {
+            return null;
+          }
+
+          return AppRoutes.publicVisitorHomePath;
+        }
+
+        if (!RoleAccess.canAccessMemberArea(role)) {
+          if (path == AppRoutes.publicMapPath || path == AppRoutes.accessDeniedPath) {
+            return null;
+          }
+
+          return AppRoutes.accessDeniedPath;
+        }
+
+        if (isAuthRoute) {
+          return AppRoutes.homePath;
+        }
+
+        if (path == AppRoutes.adminEventsPath && !RoleRouteGuard.canAccessAdmin(role)) {
+          return AppRoutes.accessDeniedPath;
+        }
+
+        if (path == AppRoutes.trackingPath && !RoleRouteGuard.canAccessTeamLeader(role)) {
+          return AppRoutes.accessDeniedPath;
+        }
+
+        if (_isMemberPath(path) && !RoleRouteGuard.canAccessMember(role)) {
+          return AppRoutes.accessDeniedPath;
         }
 
         return null;
@@ -84,7 +139,7 @@ class AppRouter {
           name: AppRoutes.home,
           path: AppRoutes.homePath,
           builder: (context, state) {
-            return const HomeScreen();
+            return HomeScreen(authStateNotifier: authStateNotifier);
           },
         ),
         GoRoute(
@@ -99,6 +154,13 @@ class AppRouter {
           path: AppRoutes.publicMapPath,
           builder: (context, state) {
             return const PublicMapScreen();
+          },
+        ),
+        GoRoute(
+          name: AppRoutes.publicVisitorHome,
+          path: AppRoutes.publicVisitorHomePath,
+          builder: (context, state) {
+            return PublicVisitorHomeScreen(authService: authService);
           },
         ),
         GoRoute(
@@ -119,7 +181,7 @@ class AppRouter {
           name: AppRoutes.profile,
           path: AppRoutes.profilePath,
           builder: (context, state) {
-            return ProfileScreen(authService: authService);
+            return ProfileScreen(authService: authService, authStateNotifier: authStateNotifier);
           },
         ),
         GoRoute(
@@ -129,17 +191,30 @@ class AppRouter {
             return const NotificationScreen();
           },
         ),
+        GoRoute(
+          name: AppRoutes.adminEvents,
+          path: AppRoutes.adminEventsPath,
+          builder: (context, state) {
+            return const AdminEventManagementScreen();
+          },
+        ),
+        GoRoute(
+          name: AppRoutes.accessDenied,
+          path: AppRoutes.accessDeniedPath,
+          builder: (context, state) {
+            return const AccessDeniedScreen();
+          },
+        ),
       ],
     );
   }
 
   static bool _isProtectedPath(String path) {
-    return path == AppRoutes.homePath ||
-        path == AppRoutes.eventsPath ||
-        path == AppRoutes.groupMapPath ||
-        path == AppRoutes.trackingPath ||
-        path == AppRoutes.profilePath ||
-        path == AppRoutes.notificationsPath;
+    return _isMemberPath(path) || path == AppRoutes.trackingPath || path == AppRoutes.adminEventsPath || path == AppRoutes.publicVisitorHomePath;
+  }
+
+  static bool _isMemberPath(String path) {
+    return path == AppRoutes.homePath || path == AppRoutes.eventsPath || path == AppRoutes.groupMapPath || path == AppRoutes.profilePath || path == AppRoutes.notificationsPath;
   }
 
   const AppRouter._();

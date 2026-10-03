@@ -8,8 +8,7 @@ class AuthService {
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
 
-  AuthService({FirebaseAuth? firebaseAuth, UserRepository? userRepository}) : _auth = firebaseAuth ?? FirebaseAuth.instance,
-        _userRepository = userRepository ?? UserRepository();
+  AuthService({FirebaseAuth? firebaseAuth, UserRepository? userRepository}) : _auth = firebaseAuth ?? FirebaseAuth.instance, _userRepository = userRepository ?? UserRepository();
 
   User? get currentFirebaseUser {
     return _auth.currentUser;
@@ -29,9 +28,12 @@ class AuthService {
     return _userRepository.read(firebaseUser.uid);
   }
 
-  Future<UserProfile> signUp({required String email, required String password, required String displayName, UserRole role = UserRole.viewer}) async {
-    final UserCredential credential = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
+  Future<UserProfile> signUp({required String email, required String password, required String displayName, UserRole role = UserRole.teamMember}) async {
+    if (role != UserRole.teamMember) {
+      throw ArgumentError('Self-registration must use the teamMember role.');
+    }
 
+    final UserCredential credential = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
     final User? firebaseUser = credential.user;
 
     if (firebaseUser == null) {
@@ -40,10 +42,11 @@ class AuthService {
 
     await firebaseUser.updateDisplayName(displayName.trim());
 
-    final UserProfile userProfile = UserProfile(id: firebaseUser.uid,
+    final UserProfile userProfile = UserProfile(
+      id: firebaseUser.uid,
       email: email.trim(),
       displayName: displayName.trim(),
-      role: role,
+      role: UserRole.teamMember,
       photoUrl: firebaseUser.photoURL,
       phoneNumber: firebaseUser.phoneNumber,
       isActive: true,
@@ -62,7 +65,6 @@ class AuthService {
 
   Future<UserProfile> signIn({required String email, required String password}) async {
     final UserCredential credential = await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
-
     final User? firebaseUser = credential.user;
 
     if (firebaseUser == null) {
@@ -73,7 +75,6 @@ class AuthService {
 
     if (userProfile == null) {
       await _auth.signOut();
-
       throw StateError('The account does not have an application profile.');
     }
 
