@@ -5,6 +5,12 @@ class AppRoutes {
   static const String login = 'login';
   static const String loginPath = '/login';
 
+  static const String registration = 'registration';
+  static const String registrationPath = '/register';
+
+  static const String forgotPassword = 'forgotPassword';
+  static const String forgotPasswordPath = '/forgot-password';
+
   static const String joinCode = 'joinCode';
   static const String joinCodePath = '/join';
 

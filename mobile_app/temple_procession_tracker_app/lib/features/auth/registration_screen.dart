@@ -1,40 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../app/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/auth_error_message.dart';
 import '../../shared/widgets/app_button.dart';
 
-class LoginScreen extends StatefulWidget {
+class RegistrationScreen extends StatefulWidget {
   final AuthService authService;
 
-  const LoginScreen({super.key, required this.authService});
+  const RegistrationScreen({super.key, required this.authService});
 
   @override
-  State<LoginScreen> createState() {
-    return _LoginScreenState();
+  State<RegistrationScreen> createState() {
+    return _RegistrationScreenState();
   }
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegistrationScreenState extends State<RegistrationScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  final TextEditingController _displayNameController = TextEditingController();
 
   final TextEditingController _emailController = TextEditingController();
 
   final TextEditingController _passwordController = TextEditingController();
+
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _signIn() async {
+  Future<void> _register() async {
     final FormState? form = _formKey.currentState;
 
     if (form == null || !form.validate()) {
@@ -47,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await widget.authService.signIn(email: _emailController.text, password: _passwordController.text);
+      await widget.authService.signUp(email: _emailController.text, password: _passwordController.text, displayName: _displayNameController.text);
     } catch (error) {
       if (!mounted) {
         return;
@@ -68,13 +72,26 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign In')),
+      appBar: AppBar(title: const Text('Create Account')),
       body: SafeArea(
         child: Form(
           key: _formKey,
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
+              TextFormField(
+                controller: _displayNameController,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Display Name'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter your display name.';
+                  }
+
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -94,16 +111,25 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: true,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (value) {
-                  if (!_isLoading) {
-                    _signIn();
-                  }
-                },
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(labelText: 'Password'),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Enter your password.';
+                  if (value == null || value.length < 6) {
+                    return 'Password must contain at least 6 characters.';
+                  }
+
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: true,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(labelText: 'Confirm Password'),
+                validator: (value) {
+                  if (value != _passwordController.text) {
+                    return 'Passwords do not match.';
                   }
 
                   return null;
@@ -114,26 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
               const SizedBox(height: 24),
-              AppButton(label: 'Sign In', isLoading: _isLoading, onPressed: _isLoading ? null : _signIn),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _isLoading ? null : () {
-                            context.push(AppRoutes.forgotPasswordPath);
-                          },
-                child: const Text('Forgot Password?'),
-              ),
-              TextButton(
-                onPressed: _isLoading ? null : () {
-                            context.push(AppRoutes.registrationPath);
-                          },
-                child: const Text('Create Account'),
-              ),
-              OutlinedButton(
-                onPressed: _isLoading ? null : () {
-                            context.push(AppRoutes.joinCodePath);
-                          },
-                child: const Text('Join with Access Code'),
-              ),
+              AppButton(label: 'Create Account', isLoading: _isLoading, onPressed: _isLoading ? null : _register),
             ],
           ),
         ),
