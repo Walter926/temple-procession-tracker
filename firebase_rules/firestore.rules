@@ -43,10 +43,15 @@ service cloud.firestore {
         || (
           isSignedIn()
           && request.auth.uid == userId
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.isActive == resource.data.isActive
-          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'displayName',
+              'photoUrl',
+              'phoneNumber',
+              'updatedAt'
+            ])
         );
 
       allow delete: if isAdmin();

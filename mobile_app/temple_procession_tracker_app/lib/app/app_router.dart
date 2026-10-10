@@ -81,6 +81,10 @@ class AppRouter {
           return AppRoutes.accessDeniedPath;
         }
 
+        if (path == AppRoutes.publicVisitorHomePath) {
+          return AppRoutes.homePath;
+        }
+
         if (isAuthRoute) {
           return AppRoutes.homePath;
         }
@@ -181,7 +185,7 @@ class AppRouter {
           name: AppRoutes.profile,
           path: AppRoutes.profilePath,
           builder: (context, state) {
-            return ProfileScreen(authService: authService, authStateNotifier: authStateNotifier);
+            return ProfileScreen(authService: authService);
           },
         ),
         GoRoute(

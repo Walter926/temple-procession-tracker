@@ -7,11 +7,11 @@ class GroupRepository {
 
   final FirebaseFirestore _firestore;
 
-  GroupRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  GroupRepository({FirebaseFirestore? firestore}) : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  CollectionReference<Map<String, dynamic>> get _collection {
+  CollectionReference<
+      Map<String, dynamic>>
+      get _collection {
     return _firestore.collection(collectionName);
   }
 
@@ -29,6 +29,16 @@ class GroupRepository {
     return ProcessionGroup.fromFirestore(document);
   }
 
+  Future<ProcessionGroup?> readByLeaderUserId(String leaderUserId) async {
+    final snapshot = await _collection.where('leaderUserId', isEqualTo: leaderUserId).limit(1).get();
+
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+
+    return ProcessionGroup.fromFirestore(snapshot.docs.first);
+  }
+
   Future<void> update(ProcessionGroup group) async {
     await _collection.doc(group.id).update(group.toFirestore());
   }
@@ -38,22 +48,22 @@ class GroupRepository {
   }
 
   Stream<ProcessionGroup?> streamById(String groupId) {
-    return _collection.doc(groupId).snapshots().map((document) {
-      if (!document.exists) {
-        return null;
-      }
+    return _collection.doc(groupId).snapshots().map(
+      (document) {
+        if (!document.exists) {
+          return null;
+        }
 
-      return ProcessionGroup.fromFirestore(document);
-    });
+        return ProcessionGroup.fromFirestore(document);
+      },
+    );
   }
 
   Stream<List<ProcessionGroup>> streamByEventId(String eventId) {
-    return _collection
-        .where('eventId', isEqualTo: eventId)
-        .orderBy('name')
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map(ProcessionGroup.fromFirestore).toList();
-    });
+    return _collection.where('eventId', isEqualTo: eventId).orderBy('name').snapshots().map(
+      (snapshot) {
+        return snapshot.docs.map(ProcessionGroup.fromFirestore).toList();
+      },
+    );
   }
 }

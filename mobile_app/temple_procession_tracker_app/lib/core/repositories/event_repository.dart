@@ -7,11 +7,11 @@ class EventRepository {
 
   final FirebaseFirestore _firestore;
 
-  EventRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  EventRepository({FirebaseFirestore? firestore}) : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  CollectionReference<Map<String, dynamic>> get _collection {
+  CollectionReference<
+      Map<String, dynamic>>
+      get _collection {
     return _firestore.collection(collectionName);
   }
 
@@ -29,6 +29,16 @@ class EventRepository {
     return Event.fromFirestore(document);
   }
 
+  Future<Event?> readByOrganizerId(String organizerId) async {
+    final snapshot = await _collection.where('organizerId', isEqualTo: organizerId).limit(1).get();
+
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+
+    return Event.fromFirestore(snapshot.docs.first);
+  }
+
   Future<void> update(Event event) async {
     await _collection.doc(event.id).update(event.toFirestore());
   }
@@ -38,18 +48,22 @@ class EventRepository {
   }
 
   Stream<Event?> streamById(String eventId) {
-    return _collection.doc(eventId).snapshots().map((document) {
-      if (!document.exists) {
-        return null;
-      }
+    return _collection.doc(eventId).snapshots().map(
+      (document) {
+        if (!document.exists) {
+          return null;
+        }
 
-      return Event.fromFirestore(document);
-    });
+        return Event.fromFirestore(document);
+      },
+    );
   }
 
   Stream<List<Event>> streamAll() {
-    return _collection.orderBy('startTime').snapshots().map((snapshot) {
-      return snapshot.docs.map(Event.fromFirestore).toList();
-    });
+    return _collection.orderBy('startTime').snapshots().map(
+      (snapshot) {
+        return snapshot.docs.map(Event.fromFirestore).toList();
+      },
+    );
   }
 }
