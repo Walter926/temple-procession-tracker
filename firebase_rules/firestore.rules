@@ -2,116 +2,155 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function active() { return signedIn() && profile().isActive == true; }
+    function admin() { return active() && profile().role == 'admin'; }
+    function organizer() { return active() && profile().role == 'organizer'; }
+    function management() { return admin() || organizer(); }
+    function eventData(eventId) { return get(/databases/$(database)/documents/events/$(eventId)).data; }
+    function routeData(routeId) { return get(/databases/$(database)/documents/routes/$(routeId)).data; }
+    function isDraft(eventId) { return eventData(eventId).status == 'draft'; }
+    function isPlanning(eventId) { return eventData(eventId).status in ['draft', 'scheduled']; }
+    function validStatus(status) { return status in ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled', 'archived']; }
+    function noContacts(d) { return !d.keys().hasAny(['organizerContact', 'emergencyContact']); }
+    function eventCoreValid(d) {
+      return noContacts(d) && d.name is string && d.name.size() > 0
+        && d.description is string && d.startTime is timestamp
+        && (d.endTime == null || d.endTime is timestamp)
+        && d.isPublic is bool && validStatus(d.status)
+        && d.mainTempleName is string && d.cityRegion is string;
     }
-
-    function currentUserRole() {
-      return get(
-        /databases/$(database)/documents/users/$(request.auth.uid)
-      ).data.role;
+    function publishedRoute(routeId, eventId) {
+      return exists(/databases/$(database)/documents/publicEvents/$(eventId))
+        && get(/databases/$(database)/documents/publicEvents/$(eventId)).data.routeId == routeId;
     }
-
-    function isAdmin() {
-      return isSignedIn()
-        && currentUserRole() == 'admin';
-    }
-
-    function isOrganizer() {
-      return isSignedIn()
-        && currentUserRole() == 'organizer';
-    }
-
-    function isManagement() {
-      return isAdmin() || isOrganizer();
-    }
+    function routeBelongsTo(routeId, eventId) { return routeData(routeId).eventId == eventId; }
+    function stopBelongsTo(stopId, routeId) { return get(/databases/$(database)/documents/stopPoints/$(stopId)).data.routeId == routeId; }
 
     match /users/{userId} {
-      allow create: if isSignedIn()
-        && request.auth.uid == userId
+      allow create: if signedIn() && request.auth.uid == userId
         && request.resource.data.role == 'teamMember'
-        && request.resource.data.email == request.auth.token.email;
-
-      allow read: if isSignedIn()
-        && (
-          request.auth.uid == userId
-          || isManagement()
-        );
-
-      allow update: if isAdmin()
-        || (
-          isSignedIn()
-          && request.auth.uid == userId
-          && request.resource.data
-            .diff(resource.data)
-            .affectedKeys()
-            .hasOnly([
-              'displayName',
-              'photoUrl',
-              'phoneNumber',
-              'updatedAt'
-            ])
-        );
-
-      allow delete: if isAdmin();
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.isActive == true;
+      allow read: if signedIn() && (request.auth.uid == userId || management());
+      allow update: if admin() || (signedIn() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoUrl', 'phoneNumber', 'updatedAt']));
+      allow delete: if admin();
     }
 
     match /events/{eventId} {
-      allow read: if isSignedIn()
-        || resource.data.isPublic == true;
+      allow read: if signedIn();
+      allow create: if management() && eventCoreValid(request.resource.data)
+        && request.resource.data.organizerId == request.auth.uid;
+      allow update: if management() && eventCoreValid(request.resource.data)
+        && request.resource.data.organizerId == resource.data.organizerId
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if admin() && resource.data.status == 'draft';
+    }
 
-      allow create, update, delete: if isManagement();
+    match /eventContacts/{eventId} {
+      allow read: if management();
+      allow create, update: if management()
+        && request.resource.data.keys().hasOnly(['organizerContact', 'emergencyContact', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['organizerContact', 'emergencyContact', 'updatedAt'])
+        && request.resource.data.organizerContact is string
+        && request.resource.data.emergencyContact is string
+        && request.resource.data.updatedAt is timestamp
+        && getAfter(/databases/$(database)/documents/events/$(eventId)).data.name is string;
+      allow delete: if management();
+    }
+
+    match /publicEvents/{eventId} {
+      allow read: if true;
+      allow create, update: if management()
+        && request.resource.data.keys().hasOnly(['name', 'cityRegion', 'mainTempleName', 'startTime', 'status', 'routeId', 'isPublic'])
+        && request.resource.data.keys().hasAll(['name', 'cityRegion', 'mainTempleName', 'startTime', 'status', 'routeId', 'isPublic'])
+        && request.resource.data.isPublic == true
+        && request.resource.data.status in ['scheduled', 'active']
+        && getAfter(/databases/$(database)/documents/events/$(eventId)).data.isPublic == true
+        && getAfter(/databases/$(database)/documents/events/$(eventId)).data.status == request.resource.data.status;
+      allow delete: if management();
     }
 
     match /routes/{routeId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+      allow read: if signedIn() || publishedRoute(routeId, resource.data.eventId);
+      allow create: if management() && request.resource.data.eventId is string
+        && isPlanning(request.resource.data.eventId)
+        && request.resource.data.color is string && request.resource.data.encodedPolyline is string;
+      allow update: if management() && request.resource.data.eventId == resource.data.eventId
+        && isPlanning(resource.data.eventId);
+      allow delete: if management() && isDraft(resource.data.eventId);
     }
 
     match /routeSegments/{segmentId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+      allow read: if signedIn();
+      allow create: if management() && isPlanning(routeData(request.resource.data.routeId).eventId);
+      allow update: if management() && request.resource.data.routeId == resource.data.routeId
+        && isPlanning(routeData(resource.data.routeId).eventId);
+      allow delete: if management() && isDraft(routeData(resource.data.routeId).eventId);
     }
 
     match /stopPoints/{stopPointId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+      allow read: if signedIn() || publishedRoute(resource.data.routeId, routeData(resource.data.routeId).eventId);
+      allow create: if management() && isPlanning(routeData(request.resource.data.routeId).eventId)
+        && request.resource.data.latitude is number && request.resource.data.longitude is number
+        && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90
+        && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180;
+      allow update: if management() && request.resource.data.routeId == resource.data.routeId
+        && isPlanning(routeData(resource.data.routeId).eventId);
+      allow delete: if management() && isDraft(routeData(resource.data.routeId).eventId);
     }
 
     match /groups/{groupId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+      allow read: if signedIn();
+      allow create: if management() && isPlanning(request.resource.data.eventId)
+        && routeBelongsTo(request.resource.data.routeId, request.resource.data.eventId)
+        && stopBelongsTo(request.resource.data.startingStopPointId, request.resource.data.routeId)
+        && stopBelongsTo(request.resource.data.endingStopPointId, request.resource.data.routeId)
+        && request.resource.data.leaderUserId == '' && request.resource.data.memberCount == 0
+        && request.resource.data.status in ['waiting', 'stopped'];
+      allow update: if management() && request.resource.data.eventId == resource.data.eventId
+        && isPlanning(resource.data.eventId)
+        && routeBelongsTo(request.resource.data.routeId, resource.data.eventId)
+        && stopBelongsTo(request.resource.data.startingStopPointId, request.resource.data.routeId)
+        && stopBelongsTo(request.resource.data.endingStopPointId, request.resource.data.routeId)
+        && request.resource.data.leaderUserId == resource.data.leaderUserId
+        && request.resource.data.memberCount == resource.data.memberCount
+        && request.resource.data.accessCodeId == resource.data.accessCodeId;
+      allow delete: if management() && isDraft(resource.data.eventId)
+        && resource.data.leaderUserId == '' && resource.data.memberCount == 0
+        && resource.data.accessCodeId == null;
     }
 
-    match /accessCodes/{accessCodeId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+    match /accessCodes/{codeId} {
+      allow read: if signedIn();
+      allow create, update, delete: if management();
     }
 
-    match /locationUpdates/{locationUpdateId} {
-      allow read: if isSignedIn();
+    match /locationUpdates/{id} {
+      allow read: if signedIn();
       allow write: if false;
     }
 
-    match /locationHistory/{historyId} {
-      allow read: if isSignedIn();
+    match /locationHistory/{id} {
+      allow read: if signedIn();
       allow write: if false;
     }
 
-    match /collisionAlerts/{alertId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+    match /collisionAlerts/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if management();
     }
 
-    match /notifications/{notificationId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+    match /notifications/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if management();
     }
 
-    match /routeSuggestions/{suggestionId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isManagement();
+    match /routeSuggestions/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if management();
     }
 
     match /{document=**} {

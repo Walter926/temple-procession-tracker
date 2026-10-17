@@ -1,27 +1,16 @@
-enum EventStatus {
-  draft,
-  scheduled,
-  active,
-  paused,
-  completed,
-  cancelled,
-  }
+enum EventStatus { draft, scheduled, active, paused, completed, cancelled, archived }
 
-extension EventStatusalue on EventStatus{
+extension EventStatusValue on EventStatus {
   String get value => name;
 }
 
 class EventStatusParser {
   static EventStatus fromJson(Object? value) {
-    final text = value?.toString();
-
-    return EventStatus.values.firstWhere(
-      (status) => status.name == text,
-      orElse: () => EventStatus.draft,
-    );
+    final String? text = value?.toString();
+    return EventStatus.values.firstWhere((status) => status.name == text, orElse: () => EventStatus.draft);
   }
 
-  static String toJson(EventStatus status) {
-    return status.name;
-  }
+  static String toJson(EventStatus status) => status.name;
+
+  const EventStatusParser._();
 }
