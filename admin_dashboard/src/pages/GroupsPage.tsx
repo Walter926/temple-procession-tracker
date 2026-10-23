@@ -3,6 +3,7 @@ import { deleteDraftGroup } from '../lib/safe_mutations';
 import { useRecords } from '../lib/records';
 import type { EventRecord, GroupRecord, RouteRecord, StopPointRecord } from '../types/domain';
 import GroupForm from './GroupForm';
+import LeaderAssignmentPanel from './LeaderAssignmentPanel';
 
 export default function GroupsPage() {
   const events = useRecords<EventRecord>('events');
@@ -20,15 +21,18 @@ export default function GroupsPage() {
   const endingStop = stops.items.find((stop) => stop.id === group?.endingStopPointId);
 
   async function removeGroup() {
-    if (!group || event?.status !== 'draft') { setError('Group deletion is allowed only for draft events.'); return; }
-    if (group.leaderUserId || group.memberCount !== 0 || group.accessCodeId) { setError('Unassign the leader, members and access code before deletion.'); return; }
+    if (!group || event?.status !== 'draft') { setError('Group deletion requires a draft event.'); return; }
+    if (group.leaderUserId || group.backupLeaderUserId || group.memberCount !== 0 || group.accessCodeId) {
+      setError('Remove leaders, members and access codes before deleting the group.'); return;
+    }
     if (!window.confirm(`Delete ${group.name}?`)) return;
     try { await deleteDraftGroup(eventId, group.id); setSelectedId(''); setError(''); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Delete failed.'); }
   }
 
   return <div><h1>Groups</h1><section className="panel"><label>Event<select value={eventId} onChange={(e) => { setEventId(e.target.value); setSelectedId(''); setEditing(false); }}>
-    <option value="">Select event</option>{events.items.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label></section>
+    <option value="">Select event</option>{events.items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+  </select></label></section>
     {eventId && <section className="panel"><button onClick={() => { setSelectedId(''); setEditing(true); }}>+ Create Group</button>
       {groups.loading && <p>Loading groups...</p>}{groups.error && <p className="error">{groups.error}</p>}
       <div className="list">{groups.items.map((item) => <div className="item" key={item.id}>
@@ -37,16 +41,16 @@ export default function GroupsPage() {
       </div>)}</div>
     </section>}
     {group && !editing && <section className="panel"><h2><i className="color-dot" style={{ background: group.color }} />{group.name}</h2>
-      <p><strong>Current status:</strong> {group.status}</p>
-      <p><strong>Assigned route:</strong> {selectedRoute?.name ?? 'Missing route'}</p>
-      <p><strong>Starting stop:</strong> {startingStop?.name ?? 'Not found'}</p>
-      <p><strong>Ending stop:</strong> {endingStop?.name ?? 'Not found'}</p>
-      <p><strong>Leader:</strong> {group.leaderUserId || 'Not assigned until Phase 21'}</p>
+      <p><strong>Status:</strong> {group.status}</p>
+      <p><strong>Route:</strong> {selectedRoute?.name ?? 'Missing route'}</p>
+      <p><strong>Start:</strong> {startingStop?.name ?? 'Not found'}</p>
+      <p><strong>End:</strong> {endingStop?.name ?? 'Not found'}</p>
       <p><strong>Members:</strong> {group.memberCount}</p>
+      <LeaderAssignmentPanel key={group.id} group={group} />
       <div className="actions"><button onClick={() => setEditing(true)}>Edit Group</button>
         <button disabled={event?.status !== 'draft'} onClick={() => void removeGroup()}>Delete Draft Group</button></div>
     </section>}
     {editing && eventId && <GroupForm key={group?.id ?? 'new'} eventId={eventId} initial={group} onCancel={() => setEditing(false)} onSaved={(id) => { setSelectedId(id); setEditing(false); }} />}
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <p role="alert" className="error">{error}</p>}
   </div>;
 }
