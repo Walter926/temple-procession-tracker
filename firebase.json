@@ -12,13 +12,13 @@
         "*.local"
       ],
       "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run lint",
-        "npm --prefix \"$RESOURCE_DIR\" run build"
+        "npm --prefix functions run lint",
+        "npm --prefix functions run build"
       ]
     }
   ],
   "hosting": {
-    "public": "admin_dashboard/public",
+    "public": "admin_dashboard/dist",
     "ignore": [
       "firebase.json",
       "**/.*",

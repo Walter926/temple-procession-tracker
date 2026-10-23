@@ -8,6 +8,7 @@ import EventDetailPage from './pages/EventDetailPage';
 import RoutesPage from './pages/RoutesPage';
 import StopPointsPage from './pages/StopPointsPage';
 import GroupsPage from './pages/GroupsPage';
+import AccessCodesPage from './pages/AccessCodesPage';
 
 export default function App() {
   return <Routes>
@@ -18,11 +19,11 @@ export default function App() {
       <Route path="/routes" element={<RoutesPage />} />
       <Route path="/stop-points" element={<StopPointsPage />} />
       <Route path="/groups" element={<GroupsPage />} />
-      <Route path="/live-map" element={<PlaceholderPage title="Live Map" detail="Live group tracking comes in later phases." />} />
-      <Route path="/access-codes" element={<PlaceholderPage title="Access Codes" detail="Access code management comes in Phase 22." />} />
-      <Route path="/alerts" element={<PlaceholderPage title="Alerts" detail="Alert management comes in later phases." />} />
-      <Route path="/users" element={<PlaceholderPage title="Users" detail="Role administration is reserved for a later phase." />} />
-      <Route path="/settings" element={<PlaceholderPage title="Settings" detail="Settings will be implemented later." />} />
+      <Route path="/access-codes" element={<AccessCodesPage />} />
+      <Route path="/live-map" element={<PlaceholderPage title="Live Map" detail="Real-time map aggregation will be added in a later phase." />} />
+      <Route path="/alerts" element={<PlaceholderPage title="Alerts" detail="Alert management comes later." />} />
+      <Route path="/users" element={<PlaceholderPage title="Users" detail="Role changes require trusted administration." />} />
+      <Route path="/settings" element={<PlaceholderPage title="Settings" detail="Settings come later." />} />
     </Route></Route>
     <Route path="*" element={<Navigate to="/events" replace />} />
   </Routes>;
