@@ -1,43 +1,16 @@
 import 'package:flutter/material.dart';
+import 'gps_permission_screen.dart';
 
-import '../../shared/widgets/app_button.dart';
-import '../../shared/widgets/app_card.dart';
-
+// Temporary Phase 23 screen. Replace with the final Phase 24 tracking screen.
 class TeamLeaderTrackingScreen extends StatelessWidget {
   const TeamLeaderTrackingScreen({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Team Leader Tracking')),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Assigned Group', style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                Text('No group assigned yet'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('GPS Status', style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                Text('Tracking inactive'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const AppButton(label: 'Start Tracking', icon: Icons.play_arrow, onPressed: null),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Team Leader Tracking')),
+    body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
+      const Text('First confirm GPS access. Live tracking is not enabled yet.'),
+      ElevatedButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GpsPermissionScreen())),
+        child: const Text('Check GPS Permission')),
+    ])),
+  );
 }
