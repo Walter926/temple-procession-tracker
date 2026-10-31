@@ -1,7 +1,7 @@
 import type { Timestamp } from 'firebase/firestore';
 
 export type EventStatus = 'draft' | 'scheduled' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived';
-export type GroupStatus = 'waiting' | 'moving' | 'stopped' | 'delayed' | 'completed' | 'emergency';
+export type GroupStatus = 'waiting' | 'preparing' | 'moving' | 'stopped' | 'delayed' | 'arrived' | 'completed' | 'emergency';
 export type StopPointType = 'temple' | 'ritual' | 'rest' | 'checkpoint' | 'food' | 'medical' | 'roadControl' | 'other';
 export interface EventRecord {
   id: string; name: string; description: string; status: EventStatus;
@@ -29,7 +29,7 @@ export interface GroupRecord {
   id: string; eventId: string; name: string; color: string; routeId: string;
   startingStopPointId: string; endingStopPointId: string; leaderUserId: string; backupLeaderUserId?: string;
   status: GroupStatus; currentLatitude: number | null; currentLongitude: number | null;
-  lastLocationUpdateAt: Timestamp | null; accessCodeId: string | null; memberCount: number;
+  lastLocationUpdateAt: Timestamp | null; statusUpdatedAt?: Timestamp | null; accessCodeId: string | null; memberCount: number;
 }
 export interface ManagementUserRecord {
   id: string; displayName: string; email: string; photoUrl?: string | null;

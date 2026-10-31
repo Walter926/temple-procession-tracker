@@ -20,7 +20,7 @@ service cloud.firestore {
       && get(/databases/$(database)/documents/publicEvents/$(eventId)).data.routeId == routeId; }
     function routeBelongsTo(routeId, eventId) { return routeData(routeId).eventId == eventId; }
     function stopBelongsTo(stopId, routeId) { return get(/databases/$(database)/documents/stopPoints/$(stopId)).data.routeId == routeId; }
-    function validGroupStatus(status) { return status in ['waiting', 'moving', 'stopped', 'delayed', 'completed', 'emergency']; }
+    function validGroupStatus(status) { return status in ['waiting', 'preparing', 'moving', 'stopped', 'delayed', 'arrived', 'completed', 'emergency']; }
 
 
     match /users/{userId} {
@@ -106,11 +106,18 @@ service cloud.firestore {
             && !(eventData(resource.data.eventId).status in ['completed','cancelled','archived']))
         )
       ) || (
+        admin() && eventData(resource.data.eventId).status in ['scheduled','active']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusUpdatedAt'])
+        && validGroupStatus(request.resource.data.status)
+        && request.resource.data.statusUpdatedAt == request.time
+      ) || (
         active() && profile().role == 'teamLeader' && resource.data.leaderUserId == request.auth.uid
         && profile().assignedGroupId == groupId && eventData(resource.data.eventId).status == 'active'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','lastLocationUpdateAt'])
         && validGroupStatus(request.resource.data.status)
-        && request.resource.data.lastLocationUpdateAt == request.time
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','lastLocationUpdateAt'])
+            && request.resource.data.lastLocationUpdateAt == request.time)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusUpdatedAt'])
+            && request.resource.data.statusUpdatedAt == request.time))
       );
       allow delete: if management() && isDraft(resource.data.eventId)
         && resource.data.leaderUserId == '' && resource.data.get('backupLeaderUserId','') == ''

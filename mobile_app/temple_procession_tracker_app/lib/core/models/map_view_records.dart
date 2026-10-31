@@ -36,10 +36,11 @@ class MapStopView {
 
 class MapGroupView {
   final String id, eventId, routeId, name, color, status, startingStopPointId, endingStopPointId;
-  const MapGroupView({required this.id, required this.eventId, required this.routeId, required this.name, required this.color, required this.status, required this.startingStopPointId, required this.endingStopPointId});
+  final DateTime? statusUpdatedAt;
+  const MapGroupView({required this.id, required this.eventId, required this.routeId, required this.name, required this.color, required this.status, required this.startingStopPointId, required this.endingStopPointId, this.statusUpdatedAt});
   factory MapGroupView.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
-    return MapGroupView(id: doc.id, eventId: '${d['eventId'] ?? ''}', routeId: '${d['routeId'] ?? ''}', name: '${d['name'] ?? ''}', color: '${d['color'] ?? '#3169A6'}', status: '${d['status'] ?? 'waiting'}', startingStopPointId: '${d['startingStopPointId'] ?? ''}', endingStopPointId: '${d['endingStopPointId'] ?? ''}');
+    return MapGroupView(id: doc.id, eventId: '${d['eventId'] ?? ''}', routeId: '${d['routeId'] ?? ''}', name: '${d['name'] ?? ''}', color: '${d['color'] ?? '#3169A6'}', status: '${d['status'] ?? 'waiting'}', startingStopPointId: '${d['startingStopPointId'] ?? ''}', endingStopPointId: '${d['endingStopPointId'] ?? ''}', statusUpdatedAt: mapDate(d['statusUpdatedAt']));
   }
 }
 

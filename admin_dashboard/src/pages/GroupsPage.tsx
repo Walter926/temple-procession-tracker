@@ -4,6 +4,7 @@ import { useRecords } from '../lib/records';
 import type { EventRecord, GroupRecord, RouteRecord, StopPointRecord } from '../types/domain';
 import GroupForm from './GroupForm';
 import LeaderAssignmentPanel from './LeaderAssignmentPanel';
+import GroupStatusOverridePanel from './GroupStatusOverridePanel';
 
 export default function GroupsPage() {
   const events = useRecords<EventRecord>('events');
@@ -47,6 +48,7 @@ export default function GroupsPage() {
       <p><strong>End:</strong> {endingStop?.name ?? 'Not found'}</p>
       <p><strong>Members:</strong> {group.memberCount}</p>
       <LeaderAssignmentPanel key={group.id} group={group} />
+      <GroupStatusOverridePanel key={group.id} group={group} />
       <div className="actions"><button onClick={() => setEditing(true)}>Edit Group</button>
         <button disabled={event?.status !== 'draft'} onClick={() => void removeGroup()}>Delete Draft Group</button></div>
     </section>}
