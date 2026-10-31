@@ -54,6 +54,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
               if (groupSnap.hasError) Text('Group details unavailable: ${groupSnap.error}'),
               if (liveSnap.hasError) Text('Live GPS unavailable: ${liveSnap.error}'),
               const Text('Legend: blue = stop; group marker = group color; route line = route color.'),
+              ...groups.map((group) => StreamBuilder<GroupProgressView?>(stream: repo.progress(group.id), builder: (context, item) => Text('${group.name}: ${item.data?.progressPercent.toStringAsFixed(1) ?? '0.0'}% complete${item.data?.isDelayed == true ? ' · DELAYED' : ''}'))),
               StreamBuilder<List<MapAnnouncementView>>(stream: repo.announcements(event.id), builder: (context, a) => Text(a.hasError ? 'Announcements unavailable.' : a.data?.isNotEmpty == true ? 'Announcement: ${a.data!.first.message}' : 'No public announcements.')),
               if (FirebaseAuth.instance.currentUser != null) StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(stream: FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(), builder: (context, profile) => profile.data?.data()?['role'] == 'teamMember'
                 ? TextButton.icon(onPressed: () => context.push(AppRoutes.joinCodePath), icon: const Icon(Icons.key), label: const Text('Join with Event Access Code'))

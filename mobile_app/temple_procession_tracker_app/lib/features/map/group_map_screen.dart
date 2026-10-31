@@ -13,112 +13,75 @@ class GroupMapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return const Scaffold(body: Center(child: Text('Sign in to view your assigned group.')));
+    if (uid == null) return Scaffold(appBar: AppBar(title: const Text('My Group Map'), leading: IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Back to Home', onPressed: () => context.go(AppRoutes.homePath))), body: const Center(child: Text('Sign in to view your assigned group.')));
 
     final repo = LiveMapRepository();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Group Map'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: 'Back to Home',
-          onPressed: () => context.go(AppRoutes.homePath),
-        ),
+        automaticallyImplyLeading: false,
+        leading: IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Back to Home', onPressed: () => context.go(AppRoutes.homePath)),
       ),
-      body: StreamBuilder<String>(
-        stream: repo.assignedGroupId(uid),
-        builder: (context, assignment) {
-          if (assignment.hasError) return Center(child: Text('Assignment unavailable: ${assignment.error}'));
-          if (!assignment.hasData) return const Center(child: CircularProgressIndicator());
+      body: StreamBuilder<String>(stream: repo.assignedGroupId(uid), builder: (context, assignment) {
+        if (assignment.hasError) return Center(child: Text('Assignment unavailable: ${assignment.error}'));
+        if (!assignment.hasData) return const Center(child: CircularProgressIndicator());
+        final id = assignment.data!;
+        if (id.isEmpty) return const Center(child: Text('You have not joined or been assigned to a group. Use a group-level access code.'));
 
-          final id = assignment.data!;
-          if (id.isEmpty) return const Center(child: Text('You have not joined or been assigned to a group. Use a group-level access code.'));
+        return StreamBuilder<MapGroupView?>(stream: repo.group(id), builder: (context, groupSnap) {
+          if (groupSnap.hasError) return Center(child: Text('Cannot load group: ${groupSnap.error}'));
+          final group = groupSnap.data;
+          if (groupSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (group == null) return const Center(child: Text('Assigned group does not exist.'));
 
-          return StreamBuilder<MapGroupView?>(
-            stream: repo.group(id),
-            builder: (context, groupSnap) {
-              if (groupSnap.hasError) return Center(child: Text('Cannot load group: ${groupSnap.error}'));
-              final group = groupSnap.data;
-              if (groupSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-              if (group == null) return const Center(child: Text('Assigned group does not exist.'));
+          return StreamBuilder<MapRouteView?>(stream: repo.route(group.routeId), builder: (context, routeSnap) {
+            if (routeSnap.hasError) return Center(child: Text('Cannot load route: ${routeSnap.error}'));
+            final route = routeSnap.data;
+            if (routeSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+            if (route == null) return const Center(child: Text('Assigned route does not exist.'));
+            if (route.eventId != group.eventId) return const Center(child: Text('Group/route event mismatch.'));
 
-              return StreamBuilder<MapRouteView?>(
-                stream: repo.route(group.routeId),
-                builder: (context, routeSnap) {
-                  if (routeSnap.hasError) return Center(child: Text('Cannot load route: ${routeSnap.error}'));
-                  final route = routeSnap.data;
-                  if (routeSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                  if (route == null) return const Center(child: Text('Assigned route does not exist.'));
-                  if (route.eventId != group.eventId) return const Center(child: Text('Group/route event mismatch.'));
+            return StreamBuilder<List<MapStopView>>(stream: repo.stops(route.id), builder: (context, stopSnap) {
+              if (stopSnap.hasError) return Center(child: Text('Cannot load stops: ${stopSnap.error}'));
+              final stops = stopSnap.data ?? [];
 
-                  return StreamBuilder<List<MapStopView>>(
-                    stream: repo.stops(route.id),
-                    builder: (context, stopSnap) {
-                      if (stopSnap.hasError) return Center(child: Text('Cannot load stops: ${stopSnap.error}'));
-                      final stops = stopSnap.data ?? [];
+              return StreamBuilder<Map<String, LiveGroupPosition>>(stream: repo.live(group.eventId), builder: (context, liveSnap) {
+                final live = liveSnap.data ?? {};
 
-                      return StreamBuilder<Map<String, LiveGroupPosition>>(
-                        stream: repo.live(group.eventId),
-                        builder: (context, liveSnap) {
-                          final live = liveSnap.data ?? {};
+                return StreamBuilder<GroupProgressView?>(stream: repo.progress(group.id), builder: (context, progressSnap) {
+                  final progress = progressSnap.data;
+                  MapStopView? named(String? stopId) { for (final stop in stops) { if (stop.id == stopId) return stop; } return null; }
 
-                          return StreamBuilder<GroupProgressView?>(
-                            stream: repo.progress(group.id),
-                            builder: (context, progressSnap) {
-                              final progress = progressSnap.data;
+                  final current = named(progress?.currentStopPointId);
+                  final next = named(progress?.nextStopPointId.isNotEmpty == true ? progress!.nextStopPointId : group.startingStopPointId);
+                  final location = live[group.id];
 
-                              MapStopView? named(String? stopId) {
-                                for (final stop in stops) {
-                                  if (stop.id == stopId) return stop;
-                                }
-                                return null;
-                              }
-
-                              final current = named(progress?.currentStopPointId);
-                              final next = named(progress?.nextStopPointId.isNotEmpty == true ? progress!.nextStopPointId : group.startingStopPointId);
-                              final location = live[group.id];
-
-                              return Column(
-                                children: [
-                                  Expanded(child: ProcessionMap(route: route, stops: stops, groups: [group], live: {if (location != null) group.id: location})),
-                                  SizedBox(
-                                    height: 218,
-                                    child: ListView(
-                                      padding: const EdgeInsets.all(12),
-                                      children: [
-                                        Text(group.name, style: Theme.of(context).textTheme.titleLarge),
-                                        Text('Status: ${group.status} · Progress: ${progress?.progressPercent.toStringAsFixed(1) ?? '0.0'}%'),
-                                        Text('Status updated: ${group.statusUpdatedAt?.toLocal().toString() ?? 'Not recorded'}'),
-                                        Text('Current stop: ${current?.name ?? 'Not confirmed'}'),
-                                        Text('Next stop: ${next?.name ?? 'Not available'}'),
-                                        Text('GPS updated: ${location?.recordedAt?.toLocal().toString() ?? 'Not reported'}${location?.stale == true ? ' (stale)' : ''}'),
-                                        if (liveSnap.hasError) Text('Live GPS unavailable: ${liveSnap.error}'),
-                                        if (progressSnap.hasError) Text('Progress unavailable: ${progressSnap.error}'),
-                                        if (progress?.isDelayed == true) const Text('This group is running behind its planned schedule.', style: TextStyle(color: Colors.orange)),
-                                        StreamBuilder<List<MapAnnouncementView>>(
-                                          stream: repo.announcements(group.eventId),
-                                          builder: (context, notices) => Text(
-                                            notices.hasError ? 'Announcements unavailable.' : notices.data?.isNotEmpty == true ? 'Organizer: ${notices.data!.first.message}' : 'No organizer announcements.',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
+                  return Column(children: [
+                    Expanded(child: ProcessionMap(route: route, stops: stops, groups: [group], live: {if (location != null) group.id: location})),
+                    SizedBox(height: 218, child: ListView(padding: const EdgeInsets.all(12), children: [
+                      Text(group.name, style: Theme.of(context).textTheme.titleLarge),
+                      Text('Status: ${group.status} · Progress: ${progress?.progressPercent.toStringAsFixed(1) ?? '0.0'}%'),
+                      LinearProgressIndicator(value: ((progress?.progressPercent ?? 0) / 100).clamp(0.0, 1.0)),
+                      Text('Nearest segment: ${progress?.currentSegmentId.isNotEmpty == true ? progress!.currentSegmentId : 'Not determined'}'),
+                      Text('Next-stop ETA: ${progress?.estimatedArrivalAt?.toLocal().toString() ?? 'Unavailable'} (straight-line estimate)'),
+                      Text('Status updated: ${group.statusUpdatedAt?.toLocal().toString() ?? 'Not recorded'}'),
+                      Text('Current stop: ${current?.name ?? 'Not confirmed'}'),
+                      Text('Next stop: ${next?.name ?? 'Not available'}'),
+                      Text('GPS updated: ${location?.recordedAt?.toLocal().toString() ?? 'Not reported'}${location?.stale == true ? ' (stale)' : ''}'),
+                      if (liveSnap.hasError) Text('Live GPS unavailable: ${liveSnap.error}'),
+                      if (progressSnap.hasError) Text('Progress unavailable: ${progressSnap.error}'),
+                      if (progress?.isDelayed == true) const Text('This group is running behind its planned schedule.', style: TextStyle(color: Colors.orange)),
+                      if (progress?.suggestedStatus == 'arrived') const Text('Arrival detected. Team leader can confirm Arrived status.', style: TextStyle(color: Colors.green)),
+                      StreamBuilder<List<MapAnnouncementView>>(stream: repo.announcements(group.eventId), builder: (context, notices) => Text(notices.hasError ? 'Announcements unavailable.' : notices.data?.isNotEmpty == true ? 'Organizer: ${notices.data!.first.message}' : 'No organizer announcements.')),
+                    ])),
+                  ]);
+                });
+              });
+            });
+          });
+        });
+      }),
     );
   }
 }

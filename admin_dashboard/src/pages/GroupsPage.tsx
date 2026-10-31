@@ -5,6 +5,8 @@ import type { EventRecord, GroupRecord, RouteRecord, StopPointRecord } from '../
 import GroupForm from './GroupForm';
 import LeaderAssignmentPanel from './LeaderAssignmentPanel';
 import GroupStatusOverridePanel from './GroupStatusOverridePanel';
+import ArrivalAlertsPanel from './ArrivalAlertsPanel';
+import GroupProgressPanel, { type ProgressRecord } from './GroupProgressPanel';
 
 export default function GroupsPage() {
   const events = useRecords<EventRecord>('events');
@@ -14,6 +16,7 @@ export default function GroupsPage() {
   const [selectedId, setSelectedId] = useState('');
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
+  const progress = useRecords<ProgressRecord>('groupProgress', 'eventId', eventId);
   const event = events.items.find((item) => item.id === eventId);
   const group = groups.items.find((item) => item.id === selectedId);
   const stops = useRecords<StopPointRecord>('stopPoints', 'routeId', group?.routeId ?? '');
@@ -49,10 +52,13 @@ export default function GroupsPage() {
       <p><strong>Members:</strong> {group.memberCount}</p>
       <LeaderAssignmentPanel key={group.id} group={group} />
       <GroupStatusOverridePanel key={group.id} group={group} />
+      <GroupProgressPanel progress={progress.items.find(p => p.groupId === group.id)} />
       <div className="actions"><button onClick={() => setEditing(true)}>Edit Group</button>
         <button disabled={event?.status !== 'draft'} onClick={() => void removeGroup()}>Delete Draft Group</button></div>
     </section>}
     {editing && eventId && <GroupForm key={group?.id ?? 'new'} eventId={eventId} initial={group} onCancel={() => setEditing(false)} onSaved={(id) => { setSelectedId(id); setEditing(false); }} />}
+    {progress.error && <p role="alert" className="error">{progress.error}</p>}
+    {eventId && <ArrivalAlertsPanel eventId={eventId} />}
     {error && <p role="alert" className="error">{error}</p>}
   </div>;
 }
