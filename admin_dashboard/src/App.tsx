@@ -9,6 +9,7 @@ import RoutesPage from './pages/RoutesPage';
 import StopPointsPage from './pages/StopPointsPage';
 import GroupsPage from './pages/GroupsPage';
 import AccessCodesPage from './pages/AccessCodesPage';
+import AnnouncementsPage from './pages/AnnouncementsPage';
 
 export default function App() {
   return <Routes>
@@ -20,6 +21,7 @@ export default function App() {
       <Route path="/stop-points" element={<StopPointsPage />} />
       <Route path="/groups" element={<GroupsPage />} />
       <Route path="/access-codes" element={<AccessCodesPage />} />
+      <Route path="/announcements" element={<AnnouncementsPage />} />
       <Route path="/live-map" element={<PlaceholderPage title="Live Map" detail="Real-time map aggregation will be added in a later phase." />} />
       <Route path="/alerts" element={<PlaceholderPage title="Alerts" detail="Alert management comes later." />} />
       <Route path="/users" element={<PlaceholderPage title="Users" detail="Role changes require trusted administration." />} />

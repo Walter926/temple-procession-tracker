@@ -116,6 +116,26 @@ service cloud.firestore {
         && resource.data.leaderUserId == '' && resource.data.get('backupLeaderUserId','') == ''
         && resource.data.memberCount == 0 && resource.data.accessCodeId == null;
     }
+
+    match /publicAnnouncements/{announcementId} {
+      allow read: if management() || (resource.data.isActive == true
+        && exists(/databases/$(database)/documents/publicEvents/$(resource.data.eventId)));
+      allow create: if management() && request.resource.data.keys().hasOnly(['eventId','message','isActive','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['eventId','message','isActive','createdAt','updatedAt'])
+        && exists(/databases/$(database)/documents/publicEvents/$(request.resource.data.eventId))
+        && request.resource.data.message is string && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 500 && request.resource.data.isActive == true
+        && request.resource.data.createdAt is timestamp && request.resource.data.updatedAt is timestamp;
+      allow update: if management() && request.resource.data.eventId == resource.data.eventId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['message','isActive','updatedAt'])
+        && request.resource.data.message is string && request.resource.data.message.size() <= 500
+        && request.resource.data.isActive is bool && request.resource.data.updatedAt is timestamp;
+      allow delete: if admin();
+    }
+    match /groupProgress/{groupId} { allow read: if signedIn(); allow write: if false; }
+    match /stopArrivals/{arrivalId} { allow read: if signedIn(); allow write: if false; }
+    match /stopPresence/{groupId} { allow read, write: if false; }
+    match /arrivalNotifications/{alertId} { allow read: if management(); allow write: if false; }
     match /accessCodes/{codeId} { allow read: if management(); allow write: if false; }
     match /memberships/{membershipId} {
       allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid);
