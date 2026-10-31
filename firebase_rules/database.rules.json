@@ -2,11 +2,44 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "trackingAssignments": {
+      ".read": false,
+      ".write": false
+    },
+    "eventStates": {
+      ".read": false,
+      ".write": false
+    },
     "liveLocations": {
       "$eventId": {
         "$groupId": {
           ".read": "auth != null",
-          ".write": false
+          ".write": "auth != null && root.child('trackingAssignments').child($groupId).child('leaderUserId').val() === auth.uid && root.child('trackingAssignments').child($groupId).child('eventId').val() === $eventId && root.child('eventStates').child($eventId).child('status').val() === 'active'",
+          ".validate": "newData.hasChildren(['userId','latitude','longitude','accuracyMeters','speedMetersPerSecond','headingDegrees','recordedAt']) && newData.child('userId').val() === auth.uid && newData.child('latitude').isNumber() && newData.child('longitude').isNumber() && newData.child('latitude').val() >= -90 && newData.child('latitude').val() <= 90 && newData.child('longitude').val() >= -180 && newData.child('longitude').val() <= 180 && newData.child('accuracyMeters').isNumber() && newData.child('accuracyMeters').val() >= 0 && newData.child('speedMetersPerSecond').isNumber() && newData.child('headingDegrees').isNumber() && newData.child('recordedAt').isNumber() && newData.child('recordedAt').val() <= now + 60000 && newData.child('recordedAt').val() >= now - 120000",
+          "$other": {
+            ".validate": false
+          },
+          "userId": {
+            ".validate": "newData.exists()"
+          },
+          "latitude": {
+            ".validate": "newData.exists()"
+          },
+          "longitude": {
+            ".validate": "newData.exists()"
+          },
+          "accuracyMeters": {
+            ".validate": "newData.exists()"
+          },
+          "speedMetersPerSecond": {
+            ".validate": "newData.exists()"
+          },
+          "headingDegrees": {
+            ".validate": "newData.exists()"
+          },
+          "recordedAt": {
+            ".validate": "newData.exists()"
+          }
         }
       }
     },
@@ -14,7 +47,20 @@
       "$eventId": {
         "$groupId": {
           ".read": "auth != null",
-          ".write": false
+          ".write": "auth != null && root.child('trackingAssignments').child($groupId).child('leaderUserId').val() === auth.uid && root.child('trackingAssignments').child($groupId).child('eventId').val() === $eventId && root.child('eventStates').child($eventId).child('status').val() === 'active'",
+          ".validate": "newData.hasChildren(['userId','state','updatedAt']) && newData.child('userId').val() === auth.uid && newData.child('state').isString() && (newData.child('state').val() === 'active' || newData.child('state').val() === 'paused' || newData.child('state').val() === 'stopped') && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() <= now + 60000 && newData.child('updatedAt').val() >= now - 120000",
+          "$other": {
+            ".validate": false
+          },
+          "userId": {
+            ".validate": "newData.exists()"
+          },
+          "state": {
+            ".validate": "newData.exists()"
+          },
+          "updatedAt": {
+            ".validate": "newData.exists()"
+          }
         }
       }
     }
