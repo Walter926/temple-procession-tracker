@@ -9,3 +9,7 @@ export { mirrorGroupAssignment, mirrorEventState } from './tracking_mirrors';
 export { mirrorGroupStatus } from './group_status_mirrors';
 export { detectStopArrival } from './stop_arrival';
 export { updateRouteProgress } from './route_progress';
+
+export { detectGroupCollision, reconcileGroupCollisions } from './collision_detection';
+
+export { mirrorCollisionAlert } from './collision_alert_mirror';

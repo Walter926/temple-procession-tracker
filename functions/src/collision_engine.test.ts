@@ -1,0 +1,10 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { findCollisions, type CollisionGroup, type CollisionStop } from './collision_engine';
+const now = Date.now();
+const stop: CollisionStop = { id: 'stopA', routeId: 'routeA', latitude: 49.2827, longitude: -123.1207, radiusMeters: 100, maxAllowedGroups: 1 };
+const group = (id: string): CollisionGroup => ({ id, routeId: 'routeA', latitude: 49.2827, longitude: -123.1207, accuracy: 10, recordedAt: now });
+test('one group is not crowded; two groups produce low severity', () => { assert.equal(findCollisions([group('a')], [stop], now).length, 0); assert.equal(findCollisions([group('a'), group('b')], [stop], now)[0].severity, 'low'); });
+test('three groups produce medium and four produce high', () => { assert.equal(findCollisions([group('a'), group('b'), group('c')], [stop], now)[0].severity, 'medium'); assert.equal(findCollisions([group('a'), group('b'), group('c'), group('d')], [stop], now)[0].severity, 'high'); });
+test('stale or inaccurate positions never count', () => { assert.equal(findCollisions([group('a'), { ...group('b'), recordedAt: now - 100000 }, { ...group('c'), accuracy: 200 }], [stop], now).length, 0); });
+test('only groups on the stop route count', () => { assert.equal(findCollisions([group('a'), { ...group('b'), routeId: 'other' }], [stop], now).length, 0); });

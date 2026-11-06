@@ -149,10 +149,14 @@ service cloud.firestore {
       allow write: if false;
     }
     match /locationUpdates/{id} { allow read: if signedIn(); allow write: if false; }
-    match /locationHistory/{id} { allow read: if signedIn(); allow write: if false; }
-    match /collisionAlerts/{id} { allow read: if signedIn(); allow create, update, delete: if management(); }
-    match /notifications/{id} { allow read: if signedIn(); allow create, update, delete: if management(); }
-    match /routeSuggestions/{id} { allow read: if signedIn(); allow create, update, delete: if management(); }
+    match /locationHistory/{id} { allow read: if management(); allow write: if false; }
+    match /collisionAlerts/{id} { allow read: if management(); allow write: if false; }
+    match /notifications/{id} { allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid); allow write: if false; }
+    match /routeSuggestions/{id} { allow read: if management(); allow write: if false; }
+    match /collisionWarnings/{id} { allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid); allow write: if false; }
+    match /collisionInstructions/{id} { allow read: if management(); allow write: if false; }
+    match /routeInstructions/{id} { allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid); allow write: if false; }
+    match /deviceTokens/{id} { allow read, write: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }

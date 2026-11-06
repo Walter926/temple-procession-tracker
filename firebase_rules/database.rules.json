@@ -40,7 +40,8 @@
           "recordedAt": {
             ".validate": "newData.exists()"
           }
-        }
+        },
+        ".read": "auth != null"
       }
     },
     "trackingStatus": {
@@ -66,6 +67,12 @@
     },
     "groupStatuses": {
       "$groupId": {
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
+    "activeCollisionAlerts": {
+      "$eventId": {
         ".read": "auth != null",
         ".write": false
       }
