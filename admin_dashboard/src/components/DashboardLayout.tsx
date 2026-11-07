@@ -7,6 +7,7 @@ const pages = [
   { to: '/groups', label: 'Groups' }, { to: '/routes', label: 'Routes' },
   { to: '/stop-points', label: 'Stop Points' }, { to: '/access-codes', label: 'Access Codes' },
   { to: '/announcements', label: 'Announcements' }, { to: '/alerts', label: 'Alerts' },
+  { to: '/route-suggestions', label: 'Route Suggestions' },
   { to: '/users', label: 'Users' }, { to: '/settings', label: 'Settings' },
 ];
 export default function DashboardLayout() {

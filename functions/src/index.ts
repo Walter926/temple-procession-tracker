@@ -15,3 +15,5 @@ export { detectGroupCollision, reconcileGroupCollisions } from './collision_dete
 export { mirrorCollisionAlert } from './collision_alert_mirror';
 
 export { resolveCollisionAlert, sendCollisionInstruction, acknowledgeCollisionWarning } from './alert_actions';
+
+export { suggestForCollision, suggestForDelay, decideRouteSuggestion } from './route_suggestions';

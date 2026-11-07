@@ -12,6 +12,7 @@ import AccessCodesPage from './pages/AccessCodesPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 
 import AlertsPage from './pages/AlertsPage';
+import RouteSuggestionsPage from './pages/RouteSuggestionsPage';
 export default function App() {
   return <Routes>
     <Route path="/login" element={<LoginPage />} />
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/announcements" element={<AnnouncementsPage />} />
       <Route path="/live-map" element={<PlaceholderPage title="Live Map" detail="Real-time map aggregation will be added in a later phase." />} />
       <Route path="/alerts" element={<AlertsPage />} />
+      <Route path="/route-suggestions" element={<RouteSuggestionsPage />} />
       <Route path="/users" element={<PlaceholderPage title="Users" detail="Role changes require trusted administration." />} />
       <Route path="/settings" element={<PlaceholderPage title="Settings" detail="Settings come later." />} />
     </Route></Route>
