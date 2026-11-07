@@ -9,6 +9,7 @@ const pages = [
   { to: '/announcements', label: 'Announcements' }, { to: '/alerts', label: 'Alerts' },
   { to: '/route-suggestions', label: 'Route Suggestions' },
   { to: '/notifications', label: 'Notifications' },
+  { to: '/location-history', label: 'Location History' },
   { to: '/users', label: 'Users' }, { to: '/settings', label: 'Settings' },
 ];
 export default function DashboardLayout() {

@@ -16,6 +16,7 @@ import LiveMapPage from './pages/LiveMapPage';
 import NotificationsPage from './pages/NotificationsPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
+import LocationHistoryPage from './pages/LocationHistoryPage';
 export default function App() {
   return <Routes>
     <Route path="/login" element={<LoginPage />} />
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="/live-map" element={<LiveMapPage />} />
       <Route path="/alerts" element={<AlertsPage />} />
       <Route path="/notifications" element={<NotificationsPage />} />
+      <Route path="/location-history" element={<LocationHistoryPage />} />
       <Route path="/route-suggestions" element={<RouteSuggestionsPage />} />
       <Route path="/users" element={<UsersPage />} />
       <Route path="/settings" element={<SettingsPage />} />

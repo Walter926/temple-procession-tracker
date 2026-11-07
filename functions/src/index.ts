@@ -19,3 +19,5 @@ export { resolveCollisionAlert, sendCollisionInstruction, acknowledgeCollisionWa
 export { suggestForCollision, suggestForDelay, decideRouteSuggestion } from './route_suggestions';
 
 export { registerDeviceToken, markNotificationRead, notificationFromCollision, notificationFromRoute, notificationFromArrival, notificationFromDelay, notificationFromStoppedGps, notificationFromAnnouncement } from './notifications';
+
+export { recordLocationHistory } from './location_history';
