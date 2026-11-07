@@ -17,3 +17,5 @@ export { mirrorCollisionAlert } from './collision_alert_mirror';
 export { resolveCollisionAlert, sendCollisionInstruction, acknowledgeCollisionWarning } from './alert_actions';
 
 export { suggestForCollision, suggestForDelay, decideRouteSuggestion } from './route_suggestions';
+
+export { registerDeviceToken, markNotificationRead, notificationFromCollision, notificationFromRoute, notificationFromArrival, notificationFromDelay, notificationFromStoppedGps, notificationFromAnnouncement } from './notifications';
