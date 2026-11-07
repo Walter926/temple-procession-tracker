@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout';
 import { RequireManagement } from './components/RequireManagement';
 import LoginPage from './pages/LoginPage';
-import PlaceholderPage from './pages/PlaceholderPage';
 import EventsPage from './pages/EventsPage';
 import EventDetailPage from './pages/EventDetailPage';
 import RoutesPage from './pages/RoutesPage';
@@ -14,6 +13,9 @@ import AnnouncementsPage from './pages/AnnouncementsPage';
 import AlertsPage from './pages/AlertsPage';
 import RouteSuggestionsPage from './pages/RouteSuggestionsPage';
 import LiveMapPage from './pages/LiveMapPage';
+import NotificationsPage from './pages/NotificationsPage';
+import UsersPage from './pages/UsersPage';
+import SettingsPage from './pages/SettingsPage';
 export default function App() {
   return <Routes>
     <Route path="/login" element={<LoginPage />} />
@@ -27,9 +29,10 @@ export default function App() {
       <Route path="/announcements" element={<AnnouncementsPage />} />
       <Route path="/live-map" element={<LiveMapPage />} />
       <Route path="/alerts" element={<AlertsPage />} />
+      <Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/route-suggestions" element={<RouteSuggestionsPage />} />
-      <Route path="/users" element={<PlaceholderPage title="Users" detail="Role changes require trusted administration." />} />
-      <Route path="/settings" element={<PlaceholderPage title="Settings" detail="Settings come later." />} />
+      <Route path="/users" element={<UsersPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
     </Route></Route>
     <Route path="*" element={<Navigate to="/events" replace />} />
   </Routes>;
