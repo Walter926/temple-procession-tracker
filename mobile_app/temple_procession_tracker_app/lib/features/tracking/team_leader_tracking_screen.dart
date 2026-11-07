@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/group_status_service.dart';
 import '../../core/services/tracking_service.dart';
 import 'gps_permission_screen.dart';
+import '../notifications/collision_warnings_panel.dart';
 
 class TeamLeaderTrackingScreen extends StatefulWidget {
   const TeamLeaderTrackingScreen({super.key});
@@ -47,6 +48,7 @@ class _TeamLeaderTrackingScreenState extends State<TeamLeaderTrackingScreen> {
       if (isPaused) ElevatedButton.icon(onPressed: () => _run(tracker.resume), icon: const Icon(Icons.play_arrow), label: const Text('Resume Tracking')),
       if (isActive || isPaused) ElevatedButton.icon(onPressed: () => _run(tracker.stop), icon: const Icon(Icons.stop), label: const Text('Stop Tracking')),
       if (isActive) DropdownButtonFormField<String>(decoration: const InputDecoration(labelText: 'Update group status'), items: GroupStatusService.allowed.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (value) { if (value != null) _run(() => _status(value)); }),
+      const CollisionWarningsPanel(),
       const Text('Foreground-only GPS. Keep the app visible; no reliable background tracking is enabled.'),
     ]));
   }

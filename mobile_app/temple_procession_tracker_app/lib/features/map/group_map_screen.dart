@@ -1,4 +1,3 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +5,7 @@ import '../../app/app_routes.dart';
 import '../../core/models/map_view_records.dart';
 import '../../core/repositories/live_map_repository.dart';
 import 'widgets/procession_map.dart';
+import '../notifications/collision_warnings_panel.dart';
 
 class GroupMapScreen extends StatelessWidget {
   const GroupMapScreen({super.key});
@@ -58,8 +58,9 @@ class GroupMapScreen extends StatelessWidget {
                   final location = live[group.id];
 
                   return Column(children: [
-                    Expanded(child: ProcessionMap(route: route, stops: stops, groups: [group], live: {if (location != null) group.id: location})),
+                    Expanded(child: ProcessionMap(route: route, stops: stops, groups: [group], live: {group.id: ?location})),
                     SizedBox(height: 218, child: ListView(padding: const EdgeInsets.all(12), children: [
+                      const CollisionWarningsPanel(),
                       Text(group.name, style: Theme.of(context).textTheme.titleLarge),
                       Text('Status: ${group.status} · Progress: ${progress?.progressPercent.toStringAsFixed(1) ?? '0.0'}%'),
                       LinearProgressIndicator(value: ((progress?.progressPercent ?? 0) / 100).clamp(0.0, 1.0)),
