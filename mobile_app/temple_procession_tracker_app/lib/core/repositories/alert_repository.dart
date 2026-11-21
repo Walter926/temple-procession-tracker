@@ -7,9 +7,8 @@ class AlertRepository {
 
   final FirebaseFirestore _firestore;
 
-  AlertRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  AlertRepository({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection {
     return _firestore.collection(collectionName);
@@ -53,7 +52,7 @@ class AlertRepository {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map(CollisionAlert.fromFirestore).toList();
-    });
+          return snapshot.docs.map(CollisionAlert.fromFirestore).toList();
+        });
   }
 }

@@ -7,9 +7,8 @@ class RouteRepository {
 
   final FirebaseFirestore _firestore;
 
-  RouteRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  RouteRepository({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection {
     return _firestore.collection(collectionName);
@@ -53,7 +52,7 @@ class RouteRepository {
         .orderBy('createdAt')
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map(RouteModel.fromFirestore).toList();
-    });
+          return snapshot.docs.map(RouteModel.fromFirestore).toList();
+        });
   }
 }

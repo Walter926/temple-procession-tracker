@@ -19,6 +19,10 @@ class AppRoutes {
 
   static const String events = 'events';
   static const String eventsPath = '/events';
+  static const String eventMap = 'eventMap';
+  static const String eventMapPath = '/events/:eventId/map';
+  static String eventMapLocation(String eventId) =>
+      '/events/${Uri.encodeComponent(eventId)}/map';
 
   static const String publicMap = 'publicMap';
   static const String publicMapPath = '/public-map';

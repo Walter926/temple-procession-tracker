@@ -30,11 +30,28 @@ class RoleAccess {
   }
 
   static bool canUseTeamLeaderTracking(UserRole? role) {
-    return isAdmin(role) || isTeamLeader(role);
+    return isTeamLeader(role);
+  }
+
+  static const registrationRoles = [
+    UserRole.organizer,
+    UserRole.teamLeader,
+    UserRole.teamMember,
+  ];
+
+  static bool canManageEvent(
+    UserRole? role,
+    String userId,
+    String organizerId,
+  ) {
+    return isAdmin(role) || (isOrganizer(role) && userId == organizerId);
   }
 
   static bool canAccessMemberArea(UserRole? role) {
-    return isAdmin(role) || isOrganizer(role) || isTeamLeader(role) || isTeamMember(role);
+    return isAdmin(role) ||
+        isOrganizer(role) ||
+        isTeamLeader(role) ||
+        isTeamMember(role);
   }
 
   static bool canViewPublicMap(UserRole? role) {

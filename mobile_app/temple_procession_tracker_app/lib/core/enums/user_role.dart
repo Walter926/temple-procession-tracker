@@ -1,10 +1,4 @@
-enum UserRole {
-  admin,
-  organizer,
-  teamLeader,
-  teamMember,
-  publicVisitor,
-}
+enum UserRole { admin, organizer, teamLeader, teamMember, publicVisitor }
 
 extension UserRoleValue on UserRole {
   String get value => name;

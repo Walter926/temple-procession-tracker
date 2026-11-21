@@ -7,7 +7,29 @@
         { "fieldPath": "eventId", "order": "ASCENDING" },
         { "fieldPath": "isActive", "order": "ASCENDING" }
       ]
-    }
+    },
+    { "collectionGroup": "publicEvents", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "isPublic", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
+    { "collectionGroup": "notifications", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "uid", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "collisionWarnings", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "uid", "order": "ASCENDING" }, { "fieldPath": "state", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "routeInstructions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "uid", "order": "ASCENDING" }, { "fieldPath": "state", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "locationHistory", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "recordedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "locationHistory", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "groupId", "order": "ASCENDING" }, { "fieldPath": "recordedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "locationHistory", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "groupId", "order": "ASCENDING" }, { "fieldPath": "recordedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "groups", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "name", "order": "ASCENDING" }] },
+    { "collectionGroup": "routes", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "name", "order": "ASCENDING" }] },
+    { "collectionGroup": "stopPoints", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "routeId", "order": "ASCENDING" }, { "fieldPath": "order", "order": "ASCENDING" }] },
+    { "collectionGroup": "routeSegments", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "routeId", "order": "ASCENDING" }, { "fieldPath": "order", "order": "ASCENDING" }] },
+    { "collectionGroup": "collisionAlerts", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "collisionAlerts", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
+    { "collectionGroup": "collisionAlerts", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "accessCodes", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "announcements", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "arrivalNotifications", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "routeSuggestions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "routeSuggestions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "collisionAlerts", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "resolvedAt", "order": "ASCENDING" }] },
+    { "collectionGroup": "memberships", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "eventId", "order": "ASCENDING" }, { "fieldPath": "groupId", "order": "ASCENDING" }] },
+    { "collectionGroup": "locationUpdates", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "groupId", "order": "ASCENDING" }, { "fieldPath": "recordedAt", "order": "DESCENDING" }] }
   ],
   "fieldOverrides": []
 }

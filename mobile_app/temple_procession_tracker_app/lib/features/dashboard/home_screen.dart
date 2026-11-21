@@ -21,12 +21,20 @@ class HomeScreen extends StatelessWidget {
       animation: authStateNotifier,
       builder: (context, child) {
         if (authStateNotifier.isProfileLoading) {
-          return Scaffold(appBar: AppBar(title: const Text('Temple Procession Tracker')), body: const AppLoading(message: 'Loading profile...'));
+          return Scaffold(
+            appBar: AppBar(title: const Text('Temple Procession Tracker')),
+            body: const AppLoading(message: 'Loading profile...'),
+          );
         }
 
         final UserRole? role = authStateNotifier.effectiveRole;
         if (role == null || !RoleAccess.canAccessMemberArea(role)) {
-          return Scaffold(appBar: AppBar(title: const Text('Temple Procession Tracker')), body: const AppError(message: 'Your application profile is unavailable.'));
+          return Scaffold(
+            appBar: AppBar(title: const Text('Temple Procession Tracker')),
+            body: const AppError(
+              message: 'Your application profile is unavailable.',
+            ),
+          );
         }
 
         return Scaffold(
@@ -38,32 +46,67 @@ class HomeScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Role', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Role',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 4),
                     Text(role.displayName),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              if (RoleAccess.canManageSystem(role)) ...[
-                AppButton(label: 'Admin Event Management', icon: Icons.admin_panel_settings, onPressed: () => context.push(AppRoutes.adminEventsPath)),
+              if (RoleAccess.canManageEvents(role)) ...[
+                AppButton(
+                  label: 'Manage My Events',
+                  icon: Icons.edit_calendar,
+                  onPressed: () => context.push(AppRoutes.adminEventsPath),
+                ),
                 const SizedBox(height: 12),
               ],
-              AppButton(label: 'Join with Access Code', icon: Icons.vpn_key, onPressed: () => context.push(AppRoutes.joinCodePath)),
+              AppButton(
+                label: 'Join with Access Code',
+                icon: Icons.vpn_key,
+                onPressed: () => context.push(AppRoutes.joinCodePath),
+              ),
               const SizedBox(height: 12),
-              AppButton(label: 'Events', icon: Icons.event, onPressed: () => context.push(AppRoutes.eventsPath)),
+              AppButton(
+                label: 'Events',
+                icon: Icons.event,
+                onPressed: () => context.push(AppRoutes.eventsPath),
+              ),
               const SizedBox(height: 12),
-              AppButton(label: 'Public Map', icon: Icons.public, onPressed: () => context.push(AppRoutes.publicMapPath)),
+              AppButton(
+                label: 'Public Map',
+                icon: Icons.public,
+                onPressed: () => context.push(AppRoutes.publicMapPath),
+              ),
               const SizedBox(height: 12),
-              AppButton(label: 'Group Map', icon: Icons.groups, onPressed: () => context.push(AppRoutes.groupMapPath)),
+              AppButton(
+                label: 'Group Map',
+                icon: Icons.groups,
+                onPressed: () => context.push(AppRoutes.groupMapPath),
+              ),
               if (RoleAccess.canUseTeamLeaderTracking(role)) ...[
                 const SizedBox(height: 12),
-                AppButton(label: 'Team Leader Tracking', icon: Icons.location_on, onPressed: () => context.push(AppRoutes.trackingPath)),
+                AppButton(
+                  label: 'Team Leader Tracking',
+                  icon: Icons.location_on,
+                  onPressed: () => context.push(AppRoutes.trackingPath),
+                ),
               ],
               const SizedBox(height: 12),
-              AppButton(label: 'Notifications', icon: Icons.notifications, onPressed: () => context.push(AppRoutes.notificationsPath)),
+              AppButton(
+                label: 'Notifications',
+                icon: Icons.notifications,
+                onPressed: () => context.push(AppRoutes.notificationsPath),
+              ),
               const SizedBox(height: 12),
-              AppButton(label: 'Profile', icon: Icons.person, onPressed: () => context.push(AppRoutes.profilePath)),
+              AppButton(
+                label: 'Profile',
+                icon: Icons.person,
+                onPressed: () => context.push(AppRoutes.profilePath),
+              ),
             ],
           ),
         );

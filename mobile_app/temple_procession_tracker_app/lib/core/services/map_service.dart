@@ -5,10 +5,7 @@ import '../models/route_segment.dart';
 import '../models/stop_point.dart';
 
 class MapService {
-  LatLng toLatLng({
-    required double latitude,
-    required double longitude,
-  }) {
+  LatLng toLatLng({required double latitude, required double longitude}) {
     return LatLng(latitude, longitude);
   }
 
@@ -35,14 +32,10 @@ class MapService {
 
     for (final segment in sortedSegments) {
       if (points.isEmpty) {
-        points.add(
-          LatLng(segment.startLatitude, segment.startLongitude),
-        );
+        points.add(LatLng(segment.startLatitude, segment.startLongitude));
       }
 
-      points.add(
-        LatLng(segment.endLatitude, segment.endLongitude),
-      );
+      points.add(LatLng(segment.endLatitude, segment.endLongitude));
     }
 
     return points;

@@ -7,7 +7,7 @@ enum StopPointType {
   medical,
   roadControl,
   other,
-  }
+}
 
 extension StopPointTypeValue on StopPointType {
   String get value => name;

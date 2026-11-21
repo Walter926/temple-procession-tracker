@@ -40,17 +40,18 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <form className="login-card" onSubmit={submit}>
+        <img className="brand-logo login-logo" src="/temple-icon.png" alt="" />
         <h1>Temple Procession Tracker</h1>
         <p>Management Dashboard</p>
 
         <label>
           Email
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
 
         <label>
           Password
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
 
         {error && <p className="error" role="alert">{error}</p>}

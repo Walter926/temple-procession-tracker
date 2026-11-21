@@ -7,9 +7,8 @@ class StopPointRepository {
 
   final FirebaseFirestore _firestore;
 
-  StopPointRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  StopPointRepository({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection {
     return _firestore.collection(collectionName);
@@ -53,7 +52,7 @@ class StopPointRepository {
         .orderBy('order')
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map(StopPoint.fromFirestore).toList();
-    });
+          return snapshot.docs.map(StopPoint.fromFirestore).toList();
+        });
   }
 }

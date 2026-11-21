@@ -14,10 +14,10 @@ class RouteService {
     RouteRepository? routeRepository,
     RouteSegmentRepository? routeSegmentRepository,
     StopPointRepository? stopPointRepository,
-  })  : _routeRepository = routeRepository ?? RouteRepository(),
-        _routeSegmentRepository =
-            routeSegmentRepository ?? RouteSegmentRepository(),
-        _stopPointRepository = stopPointRepository ?? StopPointRepository();
+  }) : _routeRepository = routeRepository ?? RouteRepository(),
+       _routeSegmentRepository =
+           routeSegmentRepository ?? RouteSegmentRepository(),
+       _stopPointRepository = stopPointRepository ?? StopPointRepository();
 
   Future<void> createRoute(RouteModel route) async {
     await _routeRepository.create(route);

@@ -8,27 +8,71 @@ class AccessCode {
   final DateTime? expiresAt;
   final DateTime createdAt;
 
-  const AccessCode({required this.id, required this.eventId, required this.groupId, this.code = '',
-    required this.isActive, required this.maxUses, required this.usedCount, this.expiresAt,
-    required this.createdAt, this.scope = 'event', this.grantedRole = 'teamMember'});
+  const AccessCode({
+    required this.id,
+    required this.eventId,
+    required this.groupId,
+    this.code = '',
+    required this.isActive,
+    required this.maxUses,
+    required this.usedCount,
+    this.expiresAt,
+    required this.createdAt,
+    this.scope = 'event',
+    this.grantedRole = 'teamMember',
+  });
+
+  bool get isExhausted => maxUses > 0 && usedCount >= maxUses;
+  String statusAt(DateTime now) => !isActive
+      ? 'Revoked'
+      : expiresAt == null || !expiresAt!.isAfter(now)
+      ? 'Expired'
+      : isExhausted
+      ? 'Exhausted'
+      : 'Active';
 
   factory AccessCode.fromJson(Map<String, dynamic> data) => AccessCode(
-    id: data['id'] as String? ?? '', eventId: data['eventId'] as String? ?? '',
-    groupId: data['groupId'] as String? ?? '', code: '', scope: data['scope'] as String? ?? 'event',
+    id: data['id'] as String? ?? '',
+    eventId: data['eventId'] as String? ?? '',
+    groupId: data['groupId'] as String? ?? '',
+    code: '',
+    scope: data['scope'] as String? ?? 'event',
     grantedRole: data['grantedRole'] as String? ?? 'teamMember',
     isActive: data['enabled'] as bool? ?? data['isActive'] as bool? ?? false,
-    maxUses: (data['maxUses'] as num?)?.toInt() ?? 0, usedCount: (data['usedCount'] as num?)?.toInt() ?? 0,
-    expiresAt: _date(data['expiresAt']), createdAt: _date(data['createdAt']) ?? DateTime.now());
+    maxUses: (data['maxUses'] as num?)?.toInt() ?? 0,
+    usedCount: (data['usedCount'] as num?)?.toInt() ?? 0,
+    expiresAt: _date(data['expiresAt']),
+    createdAt: _date(data['createdAt']) ?? DateTime.now(),
+  );
 
-  factory AccessCode.fromFirestore(DocumentSnapshot<Map<String, dynamic>> document) => AccessCode.fromJson({...?document.data(), 'id': document.id});
+  factory AccessCode.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> document,
+  ) => AccessCode.fromJson({...?document.data(), 'id': document.id});
 
-  Map<String, dynamic> toJson() => { 'id': id, 'eventId': eventId, 'groupId': groupId, 'scope': scope,
-    'grantedRole': grantedRole, 'enabled': isActive, 'maxUses': maxUses, 'usedCount': usedCount,
-    'expiresAt': expiresAt?.toIso8601String(), 'createdAt': createdAt.toIso8601String() };
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'eventId': eventId,
+    'groupId': groupId,
+    'scope': scope,
+    'grantedRole': grantedRole,
+    'enabled': isActive,
+    'maxUses': maxUses,
+    'usedCount': usedCount,
+    'expiresAt': expiresAt?.toIso8601String(),
+    'createdAt': createdAt.toIso8601String(),
+  };
 
-  Map<String, dynamic> toFirestore() => { 'eventId': eventId, 'groupId': groupId, 'scope': scope,
-    'grantedRole': grantedRole, 'enabled': isActive, 'maxUses': maxUses, 'usedCount': usedCount,
-    'expiresAt': expiresAt == null ? null : Timestamp.fromDate(expiresAt!), 'createdAt': Timestamp.fromDate(createdAt) };
+  Map<String, dynamic> toFirestore() => {
+    'eventId': eventId,
+    'groupId': groupId,
+    'scope': scope,
+    'grantedRole': grantedRole,
+    'enabled': isActive,
+    'maxUses': maxUses,
+    'usedCount': usedCount,
+    'expiresAt': expiresAt == null ? null : Timestamp.fromDate(expiresAt!),
+    'createdAt': Timestamp.fromDate(createdAt),
+  };
 
   static DateTime? _date(Object? value) {
     if (value is Timestamp) return value.toDate();

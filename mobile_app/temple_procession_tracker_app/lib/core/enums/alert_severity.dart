@@ -1,10 +1,6 @@
-enum AlertSeverity {
-  info,
-  warning,
-  critical,
-  }
+enum AlertSeverity { info, warning, critical }
 
-extension AlertServerityValue on AlertSeverity{
+extension AlertServerityValue on AlertSeverity {
   String get value => name;
 }
 

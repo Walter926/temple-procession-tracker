@@ -62,10 +62,7 @@ class CollisionAlert {
   ) {
     final data = document.data() ?? <String, dynamic>{};
 
-    return CollisionAlert.fromJson({
-      ...data,
-      'id': document.id,
-    });
+    return CollisionAlert.fromJson({...data, 'id': document.id});
   }
 
   Map<String, dynamic> toFirestore() {

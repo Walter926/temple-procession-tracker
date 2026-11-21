@@ -1,9 +1,11 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_routes.dart';
+import '../../core/services/access_code_service.dart';
 
 class JoinCodeScreen extends StatefulWidget {
   const JoinCodeScreen({super.key});
@@ -30,36 +32,55 @@ class _JoinCodeScreenState extends State<JoinCodeScreen> {
       setState(() => _error = 'Please sign in before using an access code.');
       return;
     }
-    if (code.isEmpty) {
-      setState(() => _error = 'Enter an access code.');
+    if (!AccessCodeService.isValidFormat(code)) {
+      setState(
+        () => _error =
+            'Enter six letters or numbers, or a legacy 20-character hexadecimal code.',
+      );
       return;
     }
 
-    setState(() { _busy = true; _error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
 
     try {
-      final result = await FirebaseFunctions.instanceFor(region: 'us-central1')
-          .httpsCallable('redeemAccessCode')
-          .call<Map<String, dynamic>>({'code': code});
-
-      final groupId = result.data['groupId']?.toString() ?? '';
+      final result = await AccessCodeService().redeem(code);
       if (!mounted) return;
-      context.go(groupId.isNotEmpty ? AppRoutes.groupMapPath : AppRoutes.publicMapPath);
+      final groupId = result['groupId']?.toString() ?? '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            groupId.isEmpty
+                ? 'Joined event. No group has been joined.'
+                : 'Joined group. Your profile is updating.',
+          ),
+        ),
+      );
+      context.go(AppRoutes.profilePath);
     } on FirebaseFunctionsException catch (error) {
       if (!mounted) return;
       final message = switch (error.code) {
         'unauthenticated' => 'Please sign in first.',
         'not-found' => 'Invalid access code.',
         'deadline-exceeded' => 'This access code has expired.',
-        'resource-exhausted' => 'This access code has reached its maximum uses.',
-        'already-exists' => 'You already belong to another group in this event.',
-        'failed-precondition' => error.message ?? 'The code is disabled or the event is unavailable.',
-        'permission-denied' => error.message ?? 'You do not have permission to join.',
+        'resource-exhausted' =>
+          error.message ??
+              'This code is exhausted or too many attempts were made. Ask for a new code or retry later.',
+        'already-exists' =>
+          'You already belong to another group in this event.',
+        'failed-precondition' =>
+          error.message ?? 'The code is disabled or the event is unavailable.',
+        'permission-denied' =>
+          error.message ?? 'You do not have permission to join.',
         _ => error.message ?? 'Unable to redeem access code.',
       };
       setState(() => _error = message);
     } catch (error) {
-      if (mounted) setState(() => _error = 'Could not complete the request: $error');
+      if (mounted) {
+        setState(() => _error = 'Could not complete the request: $error');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -73,13 +94,26 @@ class _JoinCodeScreenState extends State<JoinCodeScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const Text('Enter the access code provided by your event organizer. You must be signed in.'),
+            const Text(
+              'Enter the six-character code from your organizer or assigned leader. Legacy 20-character hexadecimal codes are also accepted until their server-recorded expiry. New codes expire after 24 hours. An event code joins only the event, not a group.',
+            ),
             const SizedBox(height: 20),
             TextField(
               controller: _controller,
               enabled: !_busy,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(labelText: 'Access Code', hintText: 'XXXX-XXXX-XXXX-XXXX-XXXX', border: OutlineInputBorder()),
+              maxLength: 24,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9-]')),
+              ],
+              onSubmitted: (_) {
+                if (!_busy) _join();
+              },
+              decoration: const InputDecoration(
+                labelText: 'Access Code',
+                hintText: 'A7K2P9',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -89,7 +123,10 @@ class _JoinCodeScreenState extends State<JoinCodeScreen> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 16),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
           ],
         ),

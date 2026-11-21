@@ -10,6 +10,7 @@ coverage/
 
 # Android
 android/.gradle/
+**/android/.kotlin/
 android/local.properties
 android/app/debug/
 android/app/profile/
@@ -53,9 +54,26 @@ out/
 
 # Environment files
 .env
+.env.*
+!.env.example
 .env.local
 .env.development
 .env.production
+
+# Local credentials and release-only configuration
+**/secrets.properties
+**/auth.json
+**/*service-account*.json
+**/*serviceAccount*.json
+**/firebase-adminsdk-*.json
+**/android/key.properties
+**/android/local.properties
+
+# Emulator exports and temporary validation artifacts
+.emulator-data/
+.tmp/
+test-results/
+playwright-report/
 
 # IDE
 .vscode/settings.json

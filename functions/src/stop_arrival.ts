@@ -1,53 +1,60 @@
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { onValueWritten } from 'firebase-functions/v2/database';
 import { distanceMeters, insideGeofence } from './geo_math';
+import { maximumSampleGapMs, newerSample, usableSample } from './route_progress';
+import { loadRouteConfiguration, routeConfigurationVersion } from './route_configuration';
 
 const db = getFirestore;
-const minimumStayMs = 20000;
-type Stop = { id: string; order: number; latitude: number; longitude: number; radius: number };
 
-/** Server-side, idempotent arrival detection for authenticated primary leader GPS. */
-export const detectStopArrival = onValueWritten({ ref: '/liveLocations/{eventId}/{groupId}', region: 'us-central1', maxInstances: 10 }, async event => {
-  const data = event.data.after.val() as Record<string, unknown> | null;
-  if (!data) return;
+/** Dwell is measured in accepted GPS sample time, never trigger processing time. */
+export function dwellStart(stopId: string, sampleAt: number, previous: Record<string, unknown> | undefined): number {
+  const last = previous?.lastSampleAt, first = previous?.firstSeenAt;
+  return previous?.stopId === stopId && typeof last === 'number' && typeof first === 'number' &&
+    sampleAt > last && sampleAt - last <= maximumSampleGapMs && first <= last ? first : sampleAt;
+}
+
+export const detectStopArrival = onValueWritten({ ref: '/liveLocations/{eventId}/{groupId}', region: 'us-central1', maxInstances: 10, retry: true }, async event => {
+  const sample = event.data.after.val() as Record<string, unknown> | null;
+  if (!usableSample(sample, Date.now())) return;
   const { eventId, groupId } = event.params;
-  const latitude = Number(data.latitude), longitude = Number(data.longitude);
-  const accuracy = Number(data.accuracyMeters), sampleAt = Number(data.recordedAt);
-  const now = Date.now();
-  if (![latitude, longitude, accuracy, sampleAt].every(Number.isFinite) || Math.abs(now - sampleAt) > 120000 || accuracy < 0 || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return;
-  const [groupSnap, eventSnap] = await Promise.all([db().doc(`groups/${groupId}`).get(), db().doc(`events/${eventId}`).get()]);
-  const group = groupSnap.data();
-  if (!group || group.eventId !== eventId || eventSnap.data()?.status !== 'active' || !group.leaderUserId || group.leaderUserId !== data.userId) return;
-  const [leader, stopQuery] = await Promise.all([db().doc(`users/${group.leaderUserId}`).get(), db().collection('stopPoints').where('routeId', '==', String(group.routeId)).get()]);
-  if (leader.data()?.role !== 'teamLeader' || leader.data()?.isActive !== true || leader.data()?.assignedGroupId !== groupId) return;
-  const ordered: Stop[] = stopQuery.docs.map(doc => ({ id: doc.id, order: Number(doc.data().order), latitude: Number(doc.data().latitude), longitude: Number(doc.data().longitude), radius: Number(doc.data().geofenceRadiusMeters ?? 100) })).filter(stop => Number.isFinite(stop.order)).sort((a, b) => a.order - b.order);
-  const startIndex = ordered.findIndex(stop => stop.id === group.startingStopPointId);
-  const endIndex = ordered.findIndex(stop => stop.id === group.endingStopPointId);
-  if (startIndex < 0 || endIndex < startIndex) return;
-  const assigned = ordered.slice(startIndex, endIndex + 1);
-  const progressRef = db().doc(`groupProgress/${groupId}`);
-  const presenceRef = db().doc(`stopPresence/${groupId}`);
+  const groupRef = db().doc(`groups/${groupId}`);
+  const initial = (await groupRef.get()).data();
+  if (!initial?.routeId || initial.eventId !== eventId) return;
+  const routeId = String(initial.routeId);
+  const configuration = await loadRouteConfiguration(routeId);
+  if (configuration.eventId !== eventId) return;
+  const ordered = configuration.stops;
   await db().runTransaction(async tx => {
-    const [progressSnap, presenceSnap] = await Promise.all([tx.get(progressRef), tx.get(presenceRef)]);
-    const completed = new Set<string>(Array.isArray(progressSnap.data()?.completedStopIds) ? progressSnap.data()!.completedStopIds : []);
+    const progressRef = db().doc(`groupProgress/${groupId}`), presenceRef = db().doc(`stopPresence/${groupId}`);
+    const [progressSnap, presenceSnap, groupSnap, eventSnap, leaderSnap, routeSnap] = await Promise.all([
+      tx.get(progressRef), tx.get(presenceRef), tx.get(groupRef), tx.get(db().doc(`events/${eventId}`)), tx.get(db().doc(`users/${sample.userId}`)), tx.get(db().doc(`routes/${routeId}`)),
+    ]);
+    const group = groupSnap.data(), leader = leaderSnap.data(), progress = progressSnap.data(), presence = presenceSnap.data();
+    if (!group || group.deleting === true || group.eventId !== eventId || group.routeId !== routeId || group.status === 'completed' || eventSnap.data()?.status !== 'active' || eventSnap.data()?.deleting === true ||
+      routeSnap.data()?.eventId !== eventId || routeSnap.data()?.deleting === true || group.leaderUserId !== sample.userId || leader?.role !== 'teamLeader' || leader.isActive !== true || leader.deleting === true || leader.assignedGroupId !== groupId ||
+      routeConfigurationVersion(routeSnap) !== configuration.version ||
+      !newerSample(sample.recordedAt, presence?.lastSampleAt) || !newerSample(sample.recordedAt, progress?.lastArrivalSampleAt) || !usableSample(sample, Date.now())) return;
+    const start = ordered.findIndex(s => s.id === group.startingStopPointId), end = ordered.findIndex(s => s.id === group.endingStopPointId);
+    if (start < 0 || end < start) return;
+    const assigned = ordered.slice(start, end + 1);
+    const completed = new Set<string>(Array.isArray(progress?.completedStopIds) ? progress.completedStopIds : []);
     const next = assigned.find(stop => !completed.has(stop.id));
-    if (!next) { if (presenceSnap.exists) tx.delete(presenceRef); return; }
-    const distance = distanceMeters(latitude, longitude, next.latitude, next.longitude);
-    if (!insideGeofence(distance, next.radius, accuracy)) { if (presenceSnap.exists) tx.delete(presenceRef); return; }
-    const firstSeen = presenceSnap.data()?.stopId === next.id ? Number(presenceSnap.data()?.firstSeenAt ?? now) : now;
-    if (now - firstSeen < minimumStayMs) {
-      tx.set(presenceRef, { eventId, groupId, stopId: next.id, firstSeenAt: firstSeen, lastSeenAt: now, lastDistanceMeters: distance });
-      return;
-    }
-    const arrivalRef = db().doc(`stopArrivals/${groupId}_${next.id}`);
-    const arrivalSnap = await tx.get(arrivalRef);
-    if (arrivalSnap.exists) { tx.delete(presenceRef); return; }
+    const distance = next ? distanceMeters(sample.latitude, sample.longitude, next.latitude, next.longitude) : Infinity;
+    const inside = next && insideGeofence(distance, next.geofenceRadiusMeters, sample.accuracyMeters);
+    const firstSeenAt = inside ? dwellStart(next.id, sample.recordedAt, presence?.routeId === routeId ? presence : undefined) : sample.recordedAt;
+    // Keep an outside watermark: an older delayed sample cannot recreate presence.
+    const presenceValue = { eventId, groupId, routeId, stopId: inside ? next.id : '', firstSeenAt, lastSampleAt: sample.recordedAt, lastSeenAt: Timestamp.now() };
+    if (!inside || sample.recordedAt - firstSeenAt < 20000) { tx.set(presenceRef, presenceValue); return; }
+    const arrivalRef = db().doc(`stopArrivals/${groupId}_${next.id}`), noticeRef = db().doc(`arrivalNotifications/${groupId}_${next.id}`);
+    const [arrival, notice] = await Promise.all([tx.get(arrivalRef), tx.get(noticeRef)]);
     completed.add(next.id);
     const following = assigned.find(stop => !completed.has(stop.id));
-    const arrivedAt = Timestamp.fromMillis(now);
-    tx.create(arrivalRef, { eventId, groupId, stopPointId: next.id, order: next.order, actualArrivalAt: arrivedAt, distanceMeters: distance, accuracyMeters: accuracy });
-    tx.set(progressRef, { eventId, groupId, routeId: group.routeId, completedStopIds: [...completed], completedCount: completed.size, totalStops: assigned.length, progressPercent: 100 * completed.size / assigned.length, currentStopPointId: next.id, nextStopPointId: following?.id ?? '', actualArrivalAt: arrivedAt, suggestedStatus: 'arrived' }, { merge: true });
-    tx.create(db().doc(`arrivalNotifications/${groupId}_${next.id}`), { eventId, groupId, stopPointId: next.id, message: `Group ${group.name ?? groupId} arrived at stop #${next.order}`, createdAt: arrivedAt });
-    tx.delete(presenceRef);
+    const arrivedAt = Timestamp.fromMillis(sample.recordedAt);
+    if (!arrival.exists) tx.create(arrivalRef, { eventId, groupId, stopPointId: next.id, order: next.order, actualArrivalAt: arrivedAt, distanceMeters: distance, accuracyMeters: sample.accuracyMeters });
+    const count = assigned.filter(s => completed.has(s.id)).length;
+    tx.set(progressRef, { eventId, groupId, routeId, completedStopIds: [...completed], completedCount: count, totalStops: assigned.length, progressPercent: 100 * count / assigned.length,
+      currentStopPointId: next.id, nextStopPointId: following?.id ?? '', actualArrivalAt: arrivedAt, suggestedStatus: 'arrived', lastArrivalSampleAt: sample.recordedAt }, { merge: true });
+    if (!notice.exists) tx.create(noticeRef, { eventId, groupId, stopPointId: next.id, message: `Group ${group.name ?? groupId} arrived at stop #${next.order}`, createdAt: arrivedAt });
+    tx.set(presenceRef, { ...presenceValue, stopId: '' });
   });
 });

@@ -3,160 +3,119 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
-    function active() { return signedIn() && profile().isActive == true; }
+    function active() { return signedIn() && profile().isActive == true && profile().get('deleting', false) == false; }
     function admin() { return active() && profile().role == 'admin'; }
-    function organizer() { return active() && profile().role == 'organizer'; }
-    function management() { return admin() || organizer(); }
-    function eventData(eventId) { return get(/databases/$(database)/documents/events/$(eventId)).data; }
-    function routeData(routeId) { return get(/databases/$(database)/documents/routes/$(routeId)).data; }
-    function isDraft(eventId) { return eventData(eventId).status == 'draft'; }
-    function isPlanning(eventId) { return eventData(eventId).status in ['draft', 'scheduled']; }
-    function validStatus(status) { return status in ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled', 'archived']; }
-    function noContacts(data) { return !data.keys().hasAny(['organizerContact', 'emergencyContact']); }
-    function eventCoreValid(data) { return noContacts(data) && data.name is string && data.name.size() > 0
-      && data.description is string && data.startTime is timestamp && (data.endTime == null || data.endTime is timestamp)
-      && data.isPublic is bool && validStatus(data.status) && data.mainTempleName is string && data.cityRegion is string; }
-    function publishedRoute(routeId, eventId) { return exists(/databases/$(database)/documents/publicEvents/$(eventId))
-      && get(/databases/$(database)/documents/publicEvents/$(eventId)).data.routeId == routeId; }
-    function routeBelongsTo(routeId, eventId) { return routeData(routeId).eventId == eventId; }
-    function stopBelongsTo(stopId, routeId) { return get(/databases/$(database)/documents/stopPoints/$(stopId)).data.routeId == routeId; }
-    function validGroupStatus(status) { return status in ['waiting', 'preparing', 'moving', 'stopped', 'delayed', 'arrived', 'completed', 'emergency']; }
-
-
-    match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.role == 'teamMember'
-        && request.resource.data.email == request.auth.token.email && request.resource.data.isActive == true;
-      allow read: if signedIn() && (request.auth.uid == userId || management());
-      allow update: if admin() || (signedIn() && request.auth.uid == userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoUrl', 'phoneNumber', 'updatedAt']));
-      allow delete: if admin();
+    function eventData(id) { return get(/databases/$(database)/documents/events/$(id)).data; }
+    function routeData(id) { return get(/databases/$(database)/documents/routes/$(id)).data; }
+    function ownsEvent(id) { return active() && profile().role == 'organizer' && eventData(id).organizerId == request.auth.uid; }
+    function manager(id) { return admin() || ownsEvent(id); }
+    function assignedToEvent(id) {
+      return active() && profile().role == 'teamLeader' && profile().get('assignedGroupId','') != ''
+        && get(/databases/$(database)/documents/groups/$(profile().assignedGroupId)).data.eventId == id
+        && request.auth.uid in [
+          get(/databases/$(database)/documents/groups/$(profile().assignedGroupId)).data.leaderUserId,
+          get(/databases/$(database)/documents/groups/$(profile().assignedGroupId)).data.get('backupLeaderUserId','')];
     }
-    match /events/{eventId} {
-      allow read: if signedIn();
-      allow create: if management() && eventCoreValid(request.resource.data) && request.resource.data.organizerId == request.auth.uid;
-      allow update: if management() && eventCoreValid(request.resource.data)
-        && request.resource.data.organizerId == resource.data.organizerId
-        && request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if admin() && resource.data.status == 'draft';
+    function member(id) { return active() && exists(/databases/$(database)/documents/memberships/$(id + '_' + request.auth.uid))
+      && get(/databases/$(database)/documents/memberships/$(id + '_' + request.auth.uid)).data.uid == request.auth.uid
+      && get(/databases/$(database)/documents/memberships/$(id + '_' + request.auth.uid)).data.eventId == id
+      && get(/databases/$(database)/documents/memberships/$(id + '_' + request.auth.uid)).data.get('isActive',true) == true
+      && !(get(/databases/$(database)/documents/memberships/$(id + '_' + request.auth.uid)).data.get('status','active') in ['removed','revoked']); }
+    function published(id) {
+      return exists(/databases/$(database)/documents/publicEvents/$(id));
     }
-    match /eventContacts/{eventId} {
-      allow read: if management();
-      allow create, update: if management() && request.resource.data.keys().hasOnly(['organizerContact','emergencyContact','updatedAt'])
-        && request.resource.data.keys().hasAll(['organizerContact','emergencyContact','updatedAt'])
-        && request.resource.data.organizerContact is string && request.resource.data.emergencyContact is string
-        && request.resource.data.updatedAt is timestamp
-        && getAfter(/databases/$(database)/documents/events/$(eventId)).data.name is string;
-      allow delete: if management();
+    function publicViewer() { return !signedIn() || active(); }
+    function eventReader(id) {
+      return active() && (manager(id) || member(id) || assignedToEvent(id)
+        || (eventData(id).isPublic == true && eventData(id).status in ['scheduled','active']));
     }
-    match /publicEvents/{eventId} {
-      allow read: if true;
-      allow create, update: if management()
-        && request.resource.data.keys().hasOnly(['name','cityRegion','mainTempleName','startTime','status','routeId','isPublic'])
-        && request.resource.data.keys().hasAll(['name','cityRegion','mainTempleName','startTime','status','routeId','isPublic'])
-        && request.resource.data.isPublic == true && request.resource.data.status in ['scheduled','active']
-        && getAfter(/databases/$(database)/documents/events/$(eventId)).data.isPublic == true
-        && getAfter(/databases/$(database)/documents/events/$(eventId)).data.status == request.resource.data.status;
-      allow delete: if management();
+    function routeReader(id) {
+      return eventReader(routeData(id).eventId) || (publicViewer() && published(routeData(id).eventId)
+        && get(/databases/$(database)/documents/publicEvents/$(routeData(id).eventId)).data.routeId == id);
     }
-    match /routes/{routeId} {
-      allow read: if signedIn() || publishedRoute(routeId, resource.data.eventId);
-      allow create: if management() && request.resource.data.eventId is string
-        && isPlanning(request.resource.data.eventId) && request.resource.data.color is string
-        && request.resource.data.encodedPolyline is string;
-      allow update: if management() && request.resource.data.eventId == resource.data.eventId && isPlanning(resource.data.eventId);
-      allow delete: if management() && isDraft(resource.data.eventId);
+    function validProfile(data) {
+      return data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 120
+        && (data.get('photoUrl',null) == null || (data.photoUrl is string && data.photoUrl.size() <= 2048))
+        && (data.get('phoneNumber',null) == null || (data.phoneNumber is string && data.phoneNumber.size() <= 40));
     }
-    match /routeSegments/{segmentId} {
-      allow read: if signedIn();
-      allow create: if management() && isPlanning(routeData(request.resource.data.routeId).eventId);
-      allow update: if management() && request.resource.data.routeId == resource.data.routeId
-        && isPlanning(routeData(resource.data.routeId).eventId);
-      allow delete: if management() && isDraft(routeData(resource.data.routeId).eventId);
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email','displayName','role','isActive','photoUrl','phoneNumber','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['email','displayName','role','isActive','createdAt'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role in ['organizer','teamLeader','teamMember'] && request.resource.data.isActive == true
+        && request.resource.data.createdAt is timestamp
+        && (request.resource.data.get('updatedAt',null) == null || request.resource.data.updatedAt is timestamp)
+        && validProfile(request.resource.data);
+      // An inactive account may read only its own profile so clients can enforce deactivation.
+      allow read: if signedIn() && (request.auth.uid == uid || admin());
+      allow update: if active() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','photoUrl','phoneNumber','updatedAt'])
+        && request.resource.data.updatedAt == request.time && validProfile(request.resource.data);
+      allow delete: if false;
     }
-    match /stopPoints/{stopPointId} {
-      allow read: if signedIn() || publishedRoute(resource.data.routeId, routeData(resource.data.routeId).eventId);
-      allow create: if management() && isPlanning(routeData(request.resource.data.routeId).eventId)
-        && request.resource.data.latitude is number && request.resource.data.longitude is number
-        && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90
-        && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180;
-      allow update: if management() && request.resource.data.routeId == resource.data.routeId
-        && isPlanning(routeData(resource.data.routeId).eventId);
-      allow delete: if management() && isDraft(routeData(resource.data.routeId).eventId);
-    }
-    match /groups/{groupId} {
-      allow read: if signedIn();
-      allow create: if management() && isPlanning(request.resource.data.eventId)
-        && routeBelongsTo(request.resource.data.routeId, request.resource.data.eventId)
-        && stopBelongsTo(request.resource.data.startingStopPointId, request.resource.data.routeId)
-        && stopBelongsTo(request.resource.data.endingStopPointId, request.resource.data.routeId)
-        && request.resource.data.leaderUserId == '' && request.resource.data.get('backupLeaderUserId', '') == ''
-        && request.resource.data.memberCount == 0 && request.resource.data.status in ['waiting', 'stopped'];
-      allow update: if (
-        management() && request.resource.data.eventId == resource.data.eventId
-        && routeBelongsTo(request.resource.data.routeId, resource.data.eventId)
-        && stopBelongsTo(request.resource.data.startingStopPointId, request.resource.data.routeId)
-        && stopBelongsTo(request.resource.data.endingStopPointId, request.resource.data.routeId)
-        && request.resource.data.memberCount == resource.data.memberCount
-        && request.resource.data.accessCodeId == resource.data.accessCodeId
-        && (
-          (isPlanning(resource.data.eventId)
-            && (admin() || (request.resource.data.leaderUserId == resource.data.leaderUserId
-            && request.resource.data.get('backupLeaderUserId', '') == resource.data.get('backupLeaderUserId', ''))))
-          || (admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leaderUserId','backupLeaderUserId'])
-            && !(eventData(resource.data.eventId).status in ['completed','cancelled','archived']))
-        )
-      ) || (
-        admin() && eventData(resource.data.eventId).status in ['scheduled','active']
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusUpdatedAt'])
-        && validGroupStatus(request.resource.data.status)
-        && request.resource.data.statusUpdatedAt == request.time
-      ) || (
-        active() && profile().role == 'teamLeader' && resource.data.leaderUserId == request.auth.uid
-        && profile().assignedGroupId == groupId && eventData(resource.data.eventId).status == 'active'
-        && validGroupStatus(request.resource.data.status)
-        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','lastLocationUpdateAt'])
-            && request.resource.data.lastLocationUpdateAt == request.time)
-          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusUpdatedAt'])
-            && request.resource.data.statusUpdatedAt == request.time))
-      );
-      allow delete: if management() && isDraft(resource.data.eventId)
-        && resource.data.leaderUserId == '' && resource.data.get('backupLeaderUserId','') == ''
-        && resource.data.memberCount == 0 && resource.data.accessCodeId == null;
-    }
-
-    match /publicAnnouncements/{announcementId} {
-      allow read: if management() || (resource.data.isActive == true
-        && exists(/databases/$(database)/documents/publicEvents/$(resource.data.eventId)));
-      allow create: if management() && request.resource.data.keys().hasOnly(['eventId','message','isActive','createdAt','updatedAt'])
-        && request.resource.data.keys().hasAll(['eventId','message','isActive','createdAt','updatedAt'])
-        && exists(/databases/$(database)/documents/publicEvents/$(request.resource.data.eventId))
-        && request.resource.data.message is string && request.resource.data.message.size() > 0
-        && request.resource.data.message.size() <= 500 && request.resource.data.isActive == true
-        && request.resource.data.createdAt is timestamp && request.resource.data.updatedAt is timestamp;
-      allow update: if management() && request.resource.data.eventId == resource.data.eventId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['message','isActive','updatedAt'])
-        && request.resource.data.message is string && request.resource.data.message.size() <= 500
-        && request.resource.data.isActive is bool && request.resource.data.updatedAt is timestamp;
-      allow delete: if admin();
-    }
-    match /groupProgress/{groupId} { allow read: if signedIn(); allow write: if false; }
-    match /stopArrivals/{arrivalId} { allow read: if signedIn(); allow write: if false; }
-    match /stopPresence/{groupId} { allow read, write: if false; }
-    match /arrivalNotifications/{alertId} { allow read: if management(); allow write: if false; }
-    match /accessCodes/{codeId} { allow read: if management(); allow write: if false; }
-    match /memberships/{membershipId} {
-      allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid);
+    match /events/{id} {
+      allow read: if active() && (
+        admin() || (profile().role == 'organizer' && resource.data.organizerId == request.auth.uid)
+        || member(id) || assignedToEvent(id)
+        || (resource.data.isPublic == true && resource.data.status in ['scheduled','active']));
       allow write: if false;
     }
-    match /locationUpdates/{id} { allow read: if signedIn(); allow write: if false; }
-    match /locationHistory/{id} { allow read: if management(); allow write: if false; }
-    match /collisionAlerts/{id} { allow read: if management(); allow write: if false; }
-    match /notifications/{id} { allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid); allow write: if false; }
-    match /routeSuggestions/{id} { allow read: if management(); allow write: if false; }
-    match /collisionWarnings/{id} { allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid); allow write: if false; }
-    match /collisionInstructions/{id} { allow read: if management(); allow write: if false; }
-    match /routeInstructions/{id} { allow read: if management() || (signedIn() && resource.data.uid == request.auth.uid); allow write: if false; }
-    match /deviceTokens/{id} { allow read, write: if false; }
+    match /eventContacts/{id} { allow read: if manager(id); allow write: if false; }
+    match /publicEvents/{id} { allow read: if publicViewer(); allow write: if false; }
+    match /routes/{id} {
+      allow read: if eventReader(resource.data.eventId) || (publicViewer() && published(resource.data.eventId)
+        && get(/databases/$(database)/documents/publicEvents/$(resource.data.eventId)).data.routeId == id);
+      allow write: if false;
+    }
+    match /stopPoints/{id} { allow read: if routeReader(resource.data.routeId); allow write: if false; }
+    match /routeSegments/{id} { allow read: if routeReader(resource.data.routeId); allow write: if false; }
+    match /groups/{id} {
+      allow read: if eventReader(resource.data.eventId);
+      allow create, delete: if false;
+      allow update: if active() && profile().role == 'teamLeader' && profile().get('assignedGroupId','') == id
+        && resource.data.leaderUserId == request.auth.uid && eventData(resource.data.eventId).status == 'active'
+        && request.resource.data.status in ['waiting','preparing','moving','stopped','delayed','arrived','completed','emergency']
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusUpdatedAt'])
+          && request.resource.data.statusUpdatedAt == request.time)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','lastLocationUpdateAt'])
+          && request.resource.data.lastLocationUpdateAt == request.time));
+    }
+    match /memberships/{id} {
+      allow read: if active() && (resource.data.uid == request.auth.uid || manager(resource.data.eventId));
+      allow write: if false;
+    }
+    match /accessCodes/{id} {
+      allow read: if manager(resource.data.eventId) || (active() && profile().role == 'teamLeader'
+        && profile().get('assignedGroupId','') == resource.data.groupId && resource.data.groupId != ''
+        && get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.leaderUserId == request.auth.uid);
+      allow write: if false;
+    }
+    match /publicAnnouncements/{id} {
+      allow read: if manager(resource.data.eventId) || (publicViewer() && resource.data.isActive == true && published(resource.data.eventId));
+      allow write: if false;
+    }
+    match /announcements/{id} { allow read: if manager(resource.data.eventId); allow write: if false; }
+    match /groupProgress/{id} { allow read: if eventReader(resource.data.eventId); allow write: if false; }
+    match /stopArrivals/{id} { allow read: if eventReader(resource.data.eventId); allow write: if false; }
+    match /arrivalNotifications/{id} { allow read: if manager(resource.data.eventId); allow write: if false; }
+    match /locationUpdates/{id} { allow read: if eventReader(resource.data.eventId); allow write: if false; }
+    match /locationHistory/{id} { allow read: if manager(resource.data.eventId); allow write: if false; }
+    match /collisionAlerts/{id} { allow read: if manager(resource.data.eventId); allow write: if false; }
+    match /routeSuggestions/{id} { allow read: if manager(resource.data.eventId); allow write: if false; }
+    match /collisionInstructions/{id} { allow read: if manager(resource.data.eventId); allow write: if false; }
+    match /notifications/{id} {
+      allow read: if active() && (resource.data.uid == request.auth.uid || admin() || ownsEvent(resource.data.eventId));
+      allow write: if false;
+    }
+    match /collisionWarnings/{id} {
+      allow read: if active() && (resource.data.uid == request.auth.uid || manager(resource.data.eventId));
+      allow write: if false;
+    }
+    match /routeInstructions/{id} {
+      allow read: if active() && (resource.data.uid == request.auth.uid || manager(resource.data.eventId));
+      allow write: if false;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }

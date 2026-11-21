@@ -1,4 +1,4 @@
-  import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/services/auth_service.dart';
 import '../../core/utils/auth_error_message.dart';
@@ -44,7 +44,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      await widget.authService.sendPasswordResetEmail(email: _emailController.text);
+      await widget.authService.sendPasswordResetEmail(
+        email: _emailController.text,
+      );
 
       if (!mounted) {
         return;
@@ -85,7 +87,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Email'),
                 validator: (value) {
-                  final String email = value ?.trim() ?? '';
+                  final String email = value?.trim() ?? '';
 
                   if (email.isEmpty || !email.contains('@')) {
                     return 'Enter a valid email address.';
@@ -96,14 +98,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16),
-                Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               if (_successMessage != null) ...[
                 const SizedBox(height: 16),
                 Text(_successMessage!),
               ],
               const SizedBox(height: 24),
-              AppButton(label: 'Send Reset Email', isLoading: _isLoading, onPressed: _isLoading ? null : _sendReset),
+              AppButton(
+                label: 'Send Reset Email',
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _sendReset,
+              ),
             ],
           ),
         ),

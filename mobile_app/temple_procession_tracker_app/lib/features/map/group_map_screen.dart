@@ -1,88 +1,212 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../app/app_routes.dart';
 import '../../core/models/map_view_records.dart';
 import '../../core/repositories/live_map_repository.dart';
-import 'widgets/procession_map.dart';
 import '../notifications/collision_warnings_panel.dart';
+import 'event_map_screen.dart';
+import '../notifications/announcement_composer.dart';
 
-class GroupMapScreen extends StatelessWidget {
+class GroupMapScreen extends StatefulWidget {
   const GroupMapScreen({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return Scaffold(appBar: AppBar(title: const Text('My Group Map'), leading: IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Back to Home', onPressed: () => context.go(AppRoutes.homePath))), body: const Center(child: Text('Sign in to view your assigned group.')));
+  State<GroupMapScreen> createState() => _GroupMapScreenState();
+}
 
-    final repo = LiveMapRepository();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Group Map'),
-        automaticallyImplyLeading: false,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Back to Home', onPressed: () => context.go(AppRoutes.homePath)),
+class _GroupMapScreenState extends State<GroupMapScreen> {
+  final _repo = LiveMapRepository();
+  late final _uid = FirebaseAuth.instance.currentUser?.uid;
+  late final _profile = _uid == null
+      ? Stream<Map<String, dynamic>?>.value(null)
+      : _repo.profile(_uid);
+  Stream<List<PublishedEventView>>? _managed;
+  String? _managedRole, _selected;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('My Event Map')),
+    body: SafeArea(
+      child: StreamBuilder<Map<String, dynamic>?>(
+        stream: _profile,
+        builder: (context, profileSnap) {
+          if (profileSnap.hasError) {
+            return const Center(
+              child: Text(
+                'Unable to load your event access. Try signing in again.',
+              ),
+            );
+          }
+          if (profileSnap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final profile = profileSnap.data;
+          if (_uid == null || profile?['isActive'] != true) {
+            return const Center(
+              child: Text(
+                'Sign in with an active account to view your assigned event.',
+              ),
+            );
+          }
+          final role = '${profile!['role']}';
+          if (role == 'organizer' || role == 'admin') {
+            if (_managedRole != role) {
+              _managedRole = role;
+              _managed = _repo.managedEvents(_uid, admin: role == 'admin');
+            }
+            return StreamBuilder<List<PublishedEventView>>(
+              stream: _managed,
+              builder: (context, eventsSnap) {
+                if (eventsSnap.hasError) {
+                  return Center(
+                    child: Text(
+                      'Unable to load your events: ${eventsSnap.error}',
+                    ),
+                  );
+                }
+                if (!eventsSnap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final events = eventsSnap.data!;
+                if (events.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No managed events yet. Create an event to view its groups here.',
+                    ),
+                  );
+                }
+                final selected =
+                    events.where((e) => e.id == _selected).firstOrNull ??
+                    events.first;
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        key: ValueKey(selected.id),
+                        initialValue: selected.id,
+                        decoration: const InputDecoration(
+                          labelText: 'Managed event — all groups, read-only',
+                        ),
+                        items: events
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.id,
+                                child: Text(
+                                  e.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (id) => setState(() => _selected = id),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed:
+                          [
+                            'scheduled',
+                            'active',
+                            'paused',
+                          ].contains(selected.status)
+                          ? () => showModalBottomSheet<void>(
+                              context: context,
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              builder: (context) => SingleChildScrollView(
+                                padding: EdgeInsets.only(
+                                  bottom: MediaQuery.viewInsetsOf(
+                                    context,
+                                  ).bottom,
+                                ),
+                                child: AnnouncementComposer(
+                                  eventId: selected.id,
+                                ),
+                              ),
+                            )
+                          : null,
+                      icon: const Icon(Icons.campaign_outlined),
+                      label: const Text('Send event announcement'),
+                    ),
+                    Expanded(
+                      child: EventMapView(
+                        key: ValueKey(selected.id),
+                        eventId: selected.id,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          }
+          final groupId =
+              '${profile[role == 'teamLeader' ? 'assignedGroupId' : 'joinedGroupId'] ?? ''}';
+          final eventId = '${profile['joinedEventId'] ?? ''}';
+          if (groupId.isEmpty) {
+            if (eventId.isNotEmpty) {
+              return EventMapView(key: ValueKey(eventId), eventId: eventId);
+            }
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Text(
+                  'No active event selected. Join an event or group using an access code, then select that membership. Event-only membership does not require a group.',
+                ),
+              ),
+            );
+          }
+          return Column(
+            children: [
+              CollisionWarningsPanel(groupId: groupId),
+              Expanded(
+                child: AssignedGroupMap(
+                  key: ValueKey(groupId),
+                  groupId: groupId,
+                ),
+              ),
+            ],
+          );
+        },
       ),
-      body: StreamBuilder<String>(stream: repo.assignedGroupId(uid), builder: (context, assignment) {
-        if (assignment.hasError) return Center(child: Text('Assignment unavailable: ${assignment.error}'));
-        if (!assignment.hasData) return const Center(child: CircularProgressIndicator());
-        final id = assignment.data!;
-        if (id.isEmpty) return const Center(child: Text('You have not joined or been assigned to a group. Use a group-level access code.'));
+    ),
+  );
+}
 
-        return StreamBuilder<MapGroupView?>(stream: repo.group(id), builder: (context, groupSnap) {
-          if (groupSnap.hasError) return Center(child: Text('Cannot load group: ${groupSnap.error}'));
-          final group = groupSnap.data;
-          if (groupSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (group == null) return const Center(child: Text('Assigned group does not exist.'));
+/// Also embedded by the leader screen without creating any tracking service.
+class AssignedGroupMap extends StatefulWidget {
+  final String groupId;
+  const AssignedGroupMap({super.key, required this.groupId});
+  @override
+  State<AssignedGroupMap> createState() => _AssignedGroupMapState();
+}
 
-          return StreamBuilder<MapRouteView?>(stream: repo.route(group.routeId), builder: (context, routeSnap) {
-            if (routeSnap.hasError) return Center(child: Text('Cannot load route: ${routeSnap.error}'));
-            final route = routeSnap.data;
-            if (routeSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-            if (route == null) return const Center(child: Text('Assigned route does not exist.'));
-            if (route.eventId != group.eventId) return const Center(child: Text('Group/route event mismatch.'));
-
-            return StreamBuilder<List<MapStopView>>(stream: repo.stops(route.id), builder: (context, stopSnap) {
-              if (stopSnap.hasError) return Center(child: Text('Cannot load stops: ${stopSnap.error}'));
-              final stops = stopSnap.data ?? [];
-
-              return StreamBuilder<Map<String, LiveGroupPosition>>(stream: repo.live(group.eventId), builder: (context, liveSnap) {
-                final live = liveSnap.data ?? {};
-
-                return StreamBuilder<GroupProgressView?>(stream: repo.progress(group.id), builder: (context, progressSnap) {
-                  final progress = progressSnap.data;
-                  MapStopView? named(String? stopId) { for (final stop in stops) { if (stop.id == stopId) return stop; } return null; }
-
-                  final current = named(progress?.currentStopPointId);
-                  final next = named(progress?.nextStopPointId.isNotEmpty == true ? progress!.nextStopPointId : group.startingStopPointId);
-                  final location = live[group.id];
-
-                  return Column(children: [
-                    Expanded(child: ProcessionMap(route: route, stops: stops, groups: [group], live: {group.id: ?location})),
-                    SizedBox(height: 218, child: ListView(padding: const EdgeInsets.all(12), children: [
-                      const CollisionWarningsPanel(),
-                      Text(group.name, style: Theme.of(context).textTheme.titleLarge),
-                      Text('Status: ${group.status} · Progress: ${progress?.progressPercent.toStringAsFixed(1) ?? '0.0'}%'),
-                      LinearProgressIndicator(value: ((progress?.progressPercent ?? 0) / 100).clamp(0.0, 1.0)),
-                      Text('Nearest segment: ${progress?.currentSegmentId.isNotEmpty == true ? progress!.currentSegmentId : 'Not determined'}'),
-                      Text('Next-stop ETA: ${progress?.estimatedArrivalAt?.toLocal().toString() ?? 'Unavailable'} (straight-line estimate)'),
-                      Text('Status updated: ${group.statusUpdatedAt?.toLocal().toString() ?? 'Not recorded'}'),
-                      Text('Current stop: ${current?.name ?? 'Not confirmed'}'),
-                      Text('Next stop: ${next?.name ?? 'Not available'}'),
-                      Text('GPS updated: ${location?.recordedAt?.toLocal().toString() ?? 'Not reported'}${location?.stale == true ? ' (stale)' : ''}'),
-                      if (liveSnap.hasError) Text('Live GPS unavailable: ${liveSnap.error}'),
-                      if (progressSnap.hasError) Text('Progress unavailable: ${progressSnap.error}'),
-                      if (progress?.isDelayed == true) const Text('This group is running behind its planned schedule.', style: TextStyle(color: Colors.orange)),
-                      if (progress?.suggestedStatus == 'arrived') const Text('Arrival detected. Team leader can confirm Arrived status.', style: TextStyle(color: Colors.green)),
-                      StreamBuilder<List<MapAnnouncementView>>(stream: repo.announcements(group.eventId), builder: (context, notices) => Text(notices.hasError ? 'Announcements unavailable.' : notices.data?.isNotEmpty == true ? 'Organizer: ${notices.data!.first.message}' : 'No organizer announcements.')),
-                    ])),
-                  ]);
-                });
-              });
-            });
-          });
-        });
-      }),
-    );
-  }
+class _AssignedGroupMapState extends State<AssignedGroupMap> {
+  late final _group = LiveMapRepository().group(widget.groupId);
+  @override
+  Widget build(BuildContext context) => StreamBuilder<MapGroupView?>(
+    stream: _group,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Center(
+          child: Text(
+            'Assigned group unavailable. Your membership may have changed.',
+          ),
+        );
+      }
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final group = snapshot.data;
+      if (group == null) {
+        return const Center(
+          child: Text(
+            'The assigned group no longer exists. Contact the organizer.',
+          ),
+        );
+      }
+      return EventMapView(
+        key: ValueKey('${group.eventId}:${group.id}'),
+        eventId: group.eventId,
+        groupId: group.id,
+      );
+    },
+  );
 }

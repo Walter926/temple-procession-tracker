@@ -7,8 +7,9 @@ class ProfileService {
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
 
-  ProfileService({FirebaseAuth? firebaseAuth, UserRepository? userRepository}) : _auth = firebaseAuth ?? FirebaseAuth.instance,
-        _userRepository = userRepository ?? UserRepository();
+  ProfileService({FirebaseAuth? firebaseAuth, UserRepository? userRepository})
+    : _auth = firebaseAuth ?? FirebaseAuth.instance,
+      _userRepository = userRepository ?? UserRepository();
 
   Stream<UserProfile?> watchProfile() {
     final User? user = _auth.currentUser;
@@ -31,7 +32,8 @@ class ProfileService {
 
     final UserProfile profile = await _requireProfile(user.uid);
 
-    final UserProfile updatedProfile = UserProfile(id: profile.id,
+    final UserProfile updatedProfile = UserProfile(
+      id: profile.id,
       email: profile.email,
       displayName: trimmedName,
       role: profile.role,
@@ -52,7 +54,8 @@ class ProfileService {
 
     final UserProfile profile = await _requireProfile(user.uid);
 
-    final UserProfile updatedProfile = UserProfile(id: profile.id,
+    final UserProfile updatedProfile = UserProfile(
+      id: profile.id,
       email: profile.email,
       displayName: profile.displayName,
       role: profile.role,
@@ -82,7 +85,9 @@ class ProfileService {
     final UserProfile? profile = await _userRepository.read(userId);
 
     if (profile == null) {
-      throw StateError('The signed-in user does not have an application profile.');
+      throw StateError(
+        'The signed-in user does not have an application profile.',
+      );
     }
 
     return profile;

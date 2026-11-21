@@ -10,21 +10,32 @@ class ProfileAssignmentService {
   final EventRepository _eventRepository;
   final GroupRepository _groupRepository;
 
-  ProfileAssignmentService({EventRepository? eventRepository, GroupRepository? groupRepository})
-      : _eventRepository = eventRepository ?? EventRepository(), _groupRepository = groupRepository ?? GroupRepository();
+  ProfileAssignmentService({
+    EventRepository? eventRepository,
+    GroupRepository? groupRepository,
+  }) : _eventRepository = eventRepository ?? EventRepository(),
+       _groupRepository = groupRepository ?? GroupRepository();
 
   Future<ProfileAssignment> readForProfile(UserProfile profile) async {
     if (!profile.isActive) return const ProfileAssignment();
     if (profile.role == UserRole.teamLeader) {
       ProcessionGroup? group;
-      if (profile.assignedGroupId.isNotEmpty) group = await _groupRepository.read(profile.assignedGroupId);
+      if (profile.assignedGroupId.isNotEmpty) {
+        group = await _groupRepository.read(profile.assignedGroupId);
+      }
       group ??= await _groupRepository.readByLeaderUserId(profile.id);
-      if (group == null || (group.leaderUserId != profile.id && group.backupLeaderUserId != profile.id)) return const ProfileAssignment();
+      if (group == null ||
+          (group.leaderUserId != profile.id &&
+              group.backupLeaderUserId != profile.id)) {
+        return const ProfileAssignment();
+      }
       final Event? event = await _eventRepository.read(group.eventId);
       return ProfileAssignment(event: event, group: group);
     }
     if (profile.role == UserRole.organizer) {
-      return ProfileAssignment(event: await _eventRepository.readByOrganizerId(profile.id));
+      return ProfileAssignment(
+        event: await _eventRepository.readByOrganizerId(profile.id),
+      );
     }
     return const ProfileAssignment();
   }

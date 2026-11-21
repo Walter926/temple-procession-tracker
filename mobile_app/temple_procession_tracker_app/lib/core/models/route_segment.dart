@@ -34,7 +34,6 @@ class RouteSegment {
       endLongitude: (json['endLongitude'] as num?)?.toDouble() ?? 0,
       distanceMeters: (json['distanceMeters'] as num?)?.toDouble() ?? 0,
       instruction: json['instruction'] as String? ?? '',
-          
     );
   }
 
@@ -57,10 +56,7 @@ class RouteSegment {
   ) {
     final data = document.data() ?? <String, dynamic>{};
 
-    return RouteSegment.fromJson({
-      ...data,
-      'id': document.id,
-    });
+    return RouteSegment.fromJson({...data, 'id': document.id});
   }
 
   Map<String, dynamic> toFirestore() {

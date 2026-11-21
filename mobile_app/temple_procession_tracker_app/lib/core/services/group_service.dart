@@ -5,9 +5,8 @@ import '../repositories/group_repository.dart';
 class GroupService {
   final GroupRepository _groupRepository;
 
-  GroupService({
-    GroupRepository? groupRepository,
-  }) : _groupRepository = groupRepository ?? GroupRepository();
+  GroupService({GroupRepository? groupRepository})
+    : _groupRepository = groupRepository ?? GroupRepository();
 
   Future<void> createGroup(ProcessionGroup group) async {
     await _groupRepository.create(group);
@@ -71,7 +70,9 @@ class GroupService {
   }
 
   List<ProcessionGroup> delayedGroups(List<ProcessionGroup> groups) {
-    return groups.where((group) => group.status == GroupStatus.delayed).toList();
+    return groups
+        .where((group) => group.status == GroupStatus.delayed)
+        .toList();
   }
 
   List<ProcessionGroup> activeGroups(List<ProcessionGroup> groups) {

@@ -19,7 +19,9 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.12.2
+  # Keep the verified Flutter 3.44.9 / Dart 3.12 toolchain reproducible.
+  # A newer Flutter branch requires a coordinated Android/plugin migration.
+  sdk: '>=3.12.2 <3.13.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -35,6 +37,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   firebase_core: ^4.12.1
+  firebase_app_check: ^0.4.9
   firebase_auth: 6.6.1
   cloud_firestore: ^6.7.1
   firebase_storage: ^13.4.5

@@ -1,38 +1,42 @@
 import { useState } from 'react';
-import { doc, Timestamp, writeBatch } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useSearchParams } from 'react-router-dom';
+import { saveResource, errorMessage } from '../lib/management';
+import { createSingleFlight } from '../lib/management_requests';
 import { deleteDraftRoute } from '../lib/safe_mutations';
 import { useRecords } from '../lib/records';
-import type { EventRecord, GroupRecord, RouteRecord, RouteSegmentRecord, StopPointRecord } from '../types/domain';
+import type { EventRecord, RouteRecord, RouteSegmentRecord, StopPointRecord } from '../types/domain';
 import MapCanvas from '../components/MapCanvas';
 import RouteForm from './RouteForm';
 import SegmentForm from './SegmentForm';
+import QueryFeedback from '../components/QueryFeedback';
 
 export default function RoutesPage() {
   const events = useRecords<EventRecord>('events');
-  const [eventId, setEventId] = useState('');
+  const [params] = useSearchParams();
+  const [eventId, setEventId] = useState(params.get('event') ?? '');
   const routes = useRecords<RouteRecord>('routes', 'eventId', eventId);
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const segments = useRecords<RouteSegmentRecord>('routeSegments', 'routeId', selectedRouteId);
   const stops = useRecords<StopPointRecord>('stopPoints', 'routeId', selectedRouteId);
-  const groups = useRecords<GroupRecord>('groups', 'eventId', eventId);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [flight] = useState(createSingleFlight);
 
   const event = events.items.find((item) => item.id === eventId);
   const route = routes.items.find((item) => item.id === selectedRouteId);
   const ordered = [...segments.items].sort((a, b) => a.order - b.order);
   const orderedStops = [...stops.items].sort((a, b) => a.order - b.order);
+  const planning = event && ['draft', 'scheduled'].includes(event.status);
+  const deletable = event && ['draft', 'scheduled', 'completed', 'cancelled', 'archived'].includes(event.status);
 
   async function removeRoute() {
-    if (!route || !event) return;
-    if (event.status !== 'draft') { setError('Only draft-event routes may be deleted.'); return; }
-    if (event.routeId === route.id) { setError('Choose a different primary route before deleting this route.'); return; }
-    if (segments.items.length || stops.items.length || groups.items.some((group) => group.routeId === route.id)) {
-      setError('Remove segment, stop, and group references before deleting this route.');
-      return;
-    }
-    if (!window.confirm('Delete this draft route?')) return;
+    if (!route || !event || busy) return;
+    if (!deletable) { setError('Stop or complete the event before deleting routes.'); return; }
+    if (!window.confirm(`Delete ${route.name} and its stops and segments? Groups must first be removed. Another route becomes primary if available. Planning events return to draft when their primary route changes; closed events stay closed.`)) return;
+    if (!flight.start()) return;
+    setBusy(true); setNotice('');
 
     try {
       await deleteDraftRoute(eventId, route.id);
@@ -40,21 +44,19 @@ export default function RoutesPage() {
       setError('');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Delete failed.');
-    }
+    } finally { flight.finish(); setBusy(false); }
   }
 
   async function setPrimaryRoute() {
-    if (!route || !event) return;
-    setError('');
+    if (!route || !event || !flight.start()) return;
+    setError(''); setNotice(''); setBusy(true);
 
     try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'events', eventId), { routeId: route.id, updatedAt: Timestamp.now() });
-      if (event.isPublic && (event.status === 'scheduled' || event.status === 'active')) batch.update(doc(db, 'publicEvents', eventId), { routeId: route.id });
-      await batch.commit();
+      await saveResource('event', eventId, { routeId: route.id }, eventId);
+      setNotice('Primary route saved.');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to set primary route.');
-    }
+      setError(errorMessage(reason));
+    } finally { flight.finish(); setBusy(false); }
   }
 
   return (
@@ -69,10 +71,12 @@ export default function RoutesPage() {
           </select>
         </label>
       </section>
+      <QueryFeedback state={events} />
+      {event && !planning && <p role="status">Route geometry is locked while this event is {event.status}. Create and edit routes only in draft or scheduled events. Event status is managed manually.</p>}
 
       {eventId && (
         <section className="panel">
-          <button onClick={() => { setSelectedRouteId(''); setEditing(true); }}>+ Create Route</button>
+          <button disabled={!planning || routes.items.length >= 20} onClick={() => { setSelectedRouteId(''); setEditing(true); }}>+ Create Route</button>
           {routes.loading && <p>Loading routes...</p>}
           {routes.error && <p className="error">{routes.error}</p>}
 
@@ -84,10 +88,11 @@ export default function RoutesPage() {
               </div>
             ))}
           </div>
+          <QueryFeedback state={{ ...routes, loading: false, error: '' }} />
         </section>
       )}
 
-      {editing && eventId && <RouteForm key={route?.id ?? 'new'} eventId={eventId} initial={route} onCancel={() => setEditing(false)} onSaved={(id) => { setSelectedRouteId(id); setEditing(false); }} />}
+      {editing && planning && eventId && <RouteForm key={`${eventId}:${route?.id ?? 'new'}`} eventId={eventId} initial={route} onCancel={() => setEditing(false)} onSaved={(id) => { setSelectedRouteId(id); setEditing(false); setNotice('Route saved.'); }} />}
 
       {route && !editing && (
         <section className="panel">
@@ -101,24 +106,27 @@ export default function RoutesPage() {
 
           {stops.error && <p className="error" role="alert">Unable to load stop points: {stops.error}</p>}
           {stops.loading && <p>Loading stop points...</p>}
+          <QueryFeedback state={{ ...stops, loading: false, error: '' }} />
           <MapCanvas route={route} stops={orderedStops} />
 
           <div className="actions">
-            <button onClick={() => setEditing(true)}>Edit Route</button>
-            <button disabled={event?.routeId === route.id} onClick={() => void setPrimaryRoute()}>{event?.routeId === route.id ? 'Current Primary Route' : 'Set as Event Primary Route'}</button>
-            <button disabled={event?.status !== 'draft'} onClick={() => void removeRoute()}>Delete Draft Route</button>
+            <button disabled={!planning} onClick={() => setEditing(true)}>Edit Route</button>
+            <button disabled={busy || event?.routeId === route.id} onClick={() => void setPrimaryRoute()}>{event?.routeId === route.id ? 'Current Primary Route' : 'Set as Event Primary Route'}</button>
+            <button className="danger" disabled={busy || !deletable} onClick={() => void removeRoute()}>{busy ? 'Deleting…' : 'Delete route'}</button>
           </div>
 
           <h3>Route Segments</h3>
+          <QueryFeedback state={segments} />
           <div className="list">
             {ordered.map((segment) => <div className="item" key={segment.id}><span>#{segment.order}: {segment.instruction || 'Segment'} ({segment.distanceMeters} m)</span></div>)}
           </div>
 
-          <SegmentForm routeId={route.id} nextOrder={Math.max(0, ...ordered.map((s) => s.order)) + 1} />
+          {planning && <SegmentForm eventId={eventId} routeId={route.id} nextOrder={Math.max(0, ...ordered.map((s) => s.order)) + 1} />}
         </section>
       )}
 
       {error && <p className="error" role="alert">{error}</p>}
+      {notice && <p role="status">{notice}</p>}
     </div>
   );
 }

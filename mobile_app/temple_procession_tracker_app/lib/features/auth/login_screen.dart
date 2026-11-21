@@ -47,7 +47,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await widget.authService.signIn(email: _emailController.text, password: _passwordController.text);
+      await widget.authService.signIn(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -81,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(labelText: 'Email'),
                 validator: (value) {
-                  final String email = value ?.trim() ?? '';
+                  final String email = value?.trim() ?? '';
 
                   if (email.isEmpty || !email.contains('@')) {
                     return 'Enter a valid email address.';
@@ -111,36 +114,51 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16),
-                Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 24),
-              AppButton(label: 'Sign In', isLoading: _isLoading, onPressed: _isLoading ? null : _signIn),
+              AppButton(
+                label: 'Sign In',
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _signIn,
+              ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: _isLoading ? null : () {
-                            context.push(AppRoutes.forgotPasswordPath);
-                          },
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        context.push(AppRoutes.forgotPasswordPath);
+                      },
                 child: const Text('Forgot Password?'),
               ),
               TextButton(
-                onPressed: _isLoading ? null : () {
-                            context.push(AppRoutes.registrationPath);
-                          },
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        context.push(AppRoutes.registrationPath);
+                      },
                 child: const Text('Create Account'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: _isLoading ? null : () {
-                            context.push(AppRoutes.publicMapPath);
-                          },
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        context.push(AppRoutes.publicMapPath);
+                      },
                 icon: const Icon(Icons.public),
                 label: const Text('View Public Map'),
               ),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: _isLoading ? null : () {
-                            context.push(AppRoutes.joinCodePath);
-                          },
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        context.push(AppRoutes.joinCodePath);
+                      },
                 child: const Text('Join with Access Code'),
               ),
             ],

@@ -20,14 +20,17 @@ class AuthStateNotifier extends ChangeNotifier {
   UserProfile? _userProfile;
   bool _profileLoading = false;
 
-  AuthStateNotifier({required this.authService, UserRepository? userRepository}) : _userRepository = userRepository ?? UserRepository() {
+  AuthStateNotifier({required this.authService, UserRepository? userRepository})
+    : _userRepository = userRepository ?? UserRepository() {
     _firebaseUser = authService.currentFirebaseUser;
 
     if (_firebaseUser != null) {
       _watchProfile(_firebaseUser!.uid);
     }
 
-    _authSubscription = authService.authStateChanges().listen(_handleAuthStateChanged);
+    _authSubscription = authService.authStateChanges().listen(
+      _handleAuthStateChanged,
+    );
   }
 
   User? get firebaseUser {
@@ -46,12 +49,14 @@ class AuthStateNotifier extends ChangeNotifier {
     return _profileLoading;
   }
 
+  bool get isActive => _userProfile?.isActive == true;
+
   UserRole? get effectiveRole {
     if (!isAuthenticated) {
       return UserRole.publicVisitor;
     }
 
-    return _userProfile?.role;
+    return isActive ? _userProfile?.role : null;
   }
 
   void _handleAuthStateChanged(User? user) {
@@ -77,18 +82,22 @@ class AuthStateNotifier extends ChangeNotifier {
   void _watchProfile(String userId) {
     _profileLoading = true;
 
-    _profileSubscription = _userRepository.streamById(userId).listen(
-      (UserProfile? profile) {
-        _userProfile = profile;
-        _profileLoading = false;
-        notifyListeners();
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        _userProfile = null;
-        _profileLoading = false;
-        notifyListeners();
-      },
-    );
+    _profileSubscription = _userRepository
+        .streamById(userId)
+        .listen(
+          (UserProfile? profile) {
+            if (_firebaseUser?.uid != userId) return;
+            _userProfile = profile;
+            _profileLoading = false;
+            notifyListeners();
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (_firebaseUser?.uid != userId) return;
+            _userProfile = null;
+            _profileLoading = false;
+            notifyListeners();
+          },
+        );
   }
 
   @override

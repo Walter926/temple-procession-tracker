@@ -59,10 +59,7 @@ class TrackingSession {
   ) {
     final data = document.data() ?? <String, dynamic>{};
 
-    return TrackingSession.fromJson({
-      ...data,
-      'id': document.id,
-    });
+    return TrackingSession.fromJson({...data, 'id': document.id});
   }
 
   Map<String, dynamic> toFirestore() {

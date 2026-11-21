@@ -48,10 +48,7 @@ class LocationHistoryRecord {
   ) {
     final data = document.data() ?? <String, dynamic>{};
 
-    return LocationHistoryRecord.fromJson({
-      ...data,
-      'id': document.id,
-    });
+    return LocationHistoryRecord.fromJson({...data, 'id': document.id});
   }
 
   Map<String, dynamic> toFirestore() {

@@ -1,0 +1,4 @@
+
+<resources>
+    <string name="firebase_database_url" translatable="false">https://temple-procession-walter-default-rtdb.firebaseio.com</string>
+</resources>

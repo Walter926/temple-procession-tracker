@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/auth_service.dart';
+import '../../core/enums/user_role.dart';
+import '../../core/utils/role_access.dart';
 import '../../core/utils/auth_error_message.dart';
 import '../../shared/widgets/app_button.dart';
 
@@ -24,9 +26,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   final TextEditingController _passwordController = TextEditingController();
 
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isLoading = false;
+  UserRole _role = UserRole.teamMember;
   String? _errorMessage;
 
   @override
@@ -51,7 +55,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     });
 
     try {
-      await widget.authService.signUp(email: _emailController.text, password: _passwordController.text, displayName: _displayNameController.text);
+      await widget.authService.signUp(
+        email: _emailController.text,
+        password: _passwordController.text,
+        displayName: _displayNameController.text,
+        role: _role,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -79,6 +88,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
+              DropdownButtonFormField<UserRole>(
+                initialValue: _role,
+                decoration: const InputDecoration(labelText: 'Register as'),
+                items: RoleAccess.registrationRoles
+                    .map(
+                      (role) => DropdownMenuItem(
+                        value: role,
+                        child: Text(role.displayName),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _isLoading
+                    ? null
+                    : (role) => setState(() => _role = role!),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Team leaders can publish location only after an organizer assigns them as the primary leader of an active event.',
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _displayNameController,
                 textInputAction: TextInputAction.next,
@@ -98,7 +127,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(labelText: 'Email'),
                 validator: (value) {
-                  final String email = value ?.trim() ?? '';
+                  final String email = value?.trim() ?? '';
 
                   if (email.isEmpty || !email.contains('@')) {
                     return 'Enter a valid email address.';
@@ -126,7 +155,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 controller: _confirmPasswordController,
                 obscureText: true,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(labelText: 'Confirm Password'),
+                decoration: const InputDecoration(
+                  labelText: 'Confirm Password',
+                ),
                 validator: (value) {
                   if (value != _passwordController.text) {
                     return 'Passwords do not match.';
@@ -137,10 +168,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16),
-                Text(_errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
               const SizedBox(height: 24),
-              AppButton(label: 'Create Account', isLoading: _isLoading, onPressed: _isLoading ? null : _register),
+              AppButton(
+                label: 'Create Account',
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _register,
+              ),
             ],
           ),
         ),

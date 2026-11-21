@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/user_profile.dart';
 
@@ -7,16 +8,20 @@ class UserRepository {
 
   final FirebaseFirestore _firestore;
 
-  UserRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  UserRepository({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection {
     return _firestore.collection(collectionName);
   }
 
   Future<void> create(UserProfile userProfile) async {
-    await _collection.doc(userProfile.id).set(userProfile.toFirestore());
+    // Assignment/membership pointers are exclusively written by trusted operations.
+    final data = userProfile.toFirestore()
+      ..remove('assignedGroupId')
+      ..remove('joinedEventId')
+      ..remove('joinedGroupId');
+    await _collection.doc(userProfile.id).set(data);
   }
 
   Future<UserProfile?> read(String userId) async {
@@ -30,11 +35,18 @@ class UserRepository {
   }
 
   Future<void> update(UserProfile userProfile) async {
-    await _collection.doc(userProfile.id).update(userProfile.toFirestore());
+    await _collection.doc(userProfile.id).update({
+      'displayName': userProfile.displayName,
+      'photoUrl': userProfile.photoUrl,
+      'phoneNumber': userProfile.phoneNumber,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> delete(String userId) async {
-    await _collection.doc(userId).delete();
+    await FirebaseFunctions.instanceFor(region: 'us-central1')
+        .httpsCallable('manageAccount')
+        .call({'operation': 'delete', 'uid': userId});
   }
 
   Stream<UserProfile?> streamById(String userId) {

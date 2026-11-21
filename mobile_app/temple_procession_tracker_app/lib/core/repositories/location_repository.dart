@@ -7,9 +7,8 @@ class LocationRepository {
 
   final FirebaseFirestore _firestore;
 
-  LocationRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  LocationRepository({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection {
     return _firestore.collection(collectionName);
@@ -55,8 +54,8 @@ class LocationRepository {
         .orderBy('recordedAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map(LocationUpdate.fromFirestore).toList();
-    });
+          return snapshot.docs.map(LocationUpdate.fromFirestore).toList();
+        });
   }
 
   Stream<List<LocationUpdate>> streamByEventId(String eventId) {
@@ -65,7 +64,7 @@ class LocationRepository {
         .orderBy('recordedAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map(LocationUpdate.fromFirestore).toList();
-    });
+          return snapshot.docs.map(LocationUpdate.fromFirestore).toList();
+        });
   }
 }

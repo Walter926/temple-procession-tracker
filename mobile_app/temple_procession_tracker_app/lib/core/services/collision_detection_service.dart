@@ -23,8 +23,8 @@ class CollisionDetectionService {
   CollisionDetectionService({
     LocationService? locationService,
     AlertRepository? alertRepository,
-  })  : _locationService = locationService ?? LocationService(),
-        _alertRepository = alertRepository ?? AlertRepository();
+  }) : _locationService = locationService ?? LocationService(),
+       _alertRepository = alertRepository ?? AlertRepository();
 
   List<CollisionRisk> findCloseGroups({
     required List<ProcessionGroup> groups,

@@ -1,60 +1,60 @@
-import { useState, type FormEvent } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { firebaseApp } from '../lib/firebase';
-import { useRecords } from '../lib/records';
-import type { AccessCodeRecord, EventRecord, GroupRecord } from '../types/domain';
+import { useEffect, useState, type FormEvent } from 'react';
+import { callManagement, errorMessage } from '../lib/management';
+import { useManagedEvents, useRecords } from '../lib/records';
+import QueryFeedback from '../components/QueryFeedback';
+import type { AccessCodeRecord, GroupRecord } from '../types/domain';
+import { accessCodeRequest, accessCodeStatus, DEFAULT_MAX_USES } from '../lib/access_code_contract';
+import { createSingleFlight } from '../lib/management_requests';
 
-type CreateResult = { code: string; id: string };
-const functions = getFunctions(firebaseApp);
-const createCode = httpsCallable<Record<string, unknown>, CreateResult>(functions, 'createAccessCode');
-const revokeCode = httpsCallable<{ id: string }, { revoked: boolean }>(functions, 'revokeAccessCode');
-
+interface NewCode { code: string; id: string; expiresAtMs?: number }
 export default function AccessCodesPage() {
-  const events = useRecords<EventRecord>('events');
+  const events = useManagedEvents();
   const [eventId, setEventId] = useState('');
   const groups = useRecords<GroupRecord>('groups', 'eventId', eventId);
   const codes = useRecords<AccessCodeRecord>('accessCodes', 'eventId', eventId);
   const [groupId, setGroupId] = useState('');
-  const [days, setDays] = useState('7');
-  const [maxUses, setMaxUses] = useState('25');
-  const [enabled, setEnabled] = useState(true);
-  const [latest, setLatest] = useState('');
+  const [latest, setLatest] = useState<NewCode>();
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [flight] = useState(createSingleFlight);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 10000); return () => clearInterval(timer); }, []);
+  const event = events.items.find(e => e.id === eventId);
+  const available = event && !['completed', 'cancelled', 'archived'].includes(event.status);
   async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setBusy(true); setError(''); setLatest('');
+    e.preventDefault(); e.stopPropagation();
+    if (!flight.start()) return;
+    setBusy(true); setError(''); setLatest(undefined); setNotice('');
     try {
-      const expiresAtMs = Date.now() + Number(days) * 86400000;
-      const result = await createCode({ eventId, groupId, scope: groupId ? 'group' : 'event', grantedRole: 'teamMember', expiresAtMs, maxUses: Number(maxUses), enabled });
-      setLatest(result.data.code);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create access code.'); }
-    finally { setBusy(false); }
+      if (!available || (groupId && !groups.items.some(g => g.id === groupId))) throw Error('Select an available event and a valid group.');
+      const result = await callManagement<Record<string, unknown>, NewCode>('createAccessCode', accessCodeRequest(eventId, groupId));
+      if (!/^[A-Z0-9]{6}$/.test(result.code)) throw Error('The server returned a legacy code. Update the access-code backend before issuing codes.');
+      setLatest(result);
+      setNotice('Access code generated. Copy it below; issued-code history updates automatically.');
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { flight.finish(); setBusy(false); }
   }
   async function revoke(id: string) {
-    if (!window.confirm('Revoke this access code?')) return;
-    try { await revokeCode({ id }); setError(''); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to revoke code.'); }
+    if (busy || !window.confirm('Revoke this access code? Existing memberships are unchanged.') || !flight.start()) return;
+    setBusy(true); setError('');
+    try { await callManagement('revokeAccessCode', { id }); if (latest?.id === id) setLatest(undefined); setNotice('Access code revoked.'); }
+    catch (reason) { setError(errorMessage(reason)); }
+    finally { flight.finish(); setBusy(false); }
   }
-  return <div><h1>Access Codes</h1><form className="panel form-grid" onSubmit={submit}>
-    <label>Event<select required value={eventId} onChange={(e) => { setEventId(e.target.value); setGroupId(''); setLatest(''); }}>
-      <option value="">Choose event</option>{events.items.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
-    </select></label>
-    <label>Scope / group<select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-      <option value="">Event-level code</option>{groups.items.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-    </select></label>
-    <label>Role granted<select value="teamMember" disabled><option value="teamMember">Team member (membership only)</option></select></label>
-    <label>Valid for (days)<input type="number" required min="1" max="365" value={days} onChange={(e) => setDays(e.target.value)} /></label>
-    <label>Maximum uses<input type="number" required min="1" max="1000" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} /></label>
-    <label className="inline"><input type="checkbox" style={{ width: 'auto' }} checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />Enabled</label>
-    <div className="span-2"><button type="submit" disabled={busy || !eventId}>{busy ? 'Creating...' : 'Generate Code'}</button></div>
-  </form>
-    {latest && <section className="panel"><h3>New code — copy now</h3><code>{latest}</code> <button onClick={() => void navigator.clipboard.writeText(latest)}>Copy</button><p>Codes are not stored in plaintext. You cannot retrieve this value later.</p></section>}
-    {error && <p role="alert" className="error">{error}</p>}
-    {eventId && <section className="panel"><h2>Issued codes</h2>{codes.error && <p role="alert" className="error">{codes.error}</p>}
-      {codes.items.map((code) => <div className="item" key={code.id}>
-        <span>{code.scope} · {code.usedCount}/{code.maxUses} uses · expires {code.expiresAt.toDate().toLocaleDateString()} · {code.enabled ? 'Enabled' : 'Revoked'}</span>
-        <button type="button" disabled={!code.enabled} onClick={() => void revoke(code.id)}>Revoke</button>
-      </div>)}
-    </section>}
+  async function copy() {
+    try { await navigator.clipboard.writeText(latest?.code ?? ''); setNotice('Code copied.'); }
+    catch { setError('Unable to copy. Select the code and copy it manually.'); }
+  }
+  return <div><h1>Access codes</h1><p className="subtle">Six alphanumeric characters · Valid for 24 hours · Up to {DEFAULT_MAX_USES} eligible members per new code. Codes grant membership only, never leader publishing rights.</p>
+    <form className="panel" noValidate onSubmit={submit}><div className="form-grid"><label>Event<select name="codeEvent" required disabled={busy} value={eventId} onChange={e => { setEventId(e.target.value); setGroupId(''); setLatest(undefined); setNotice(''); setError(''); }}>
+      <option value="">Choose event</option>{events.items.filter(e => !['completed', 'cancelled', 'archived'].includes(e.status)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
+      <label>Scope<select name="codeScope" disabled={busy} value={groupId} onChange={e => { setGroupId(e.target.value); setLatest(undefined); setNotice(''); setError(''); }}><option value="">Event membership (no group)</option>{groups.items.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+    </div><QueryFeedback state={events} /><QueryFeedback state={groups} /><p>Assigned primary leaders can generate codes for their own group from the phone. Organizers manage codes for their events; administrators manage all events.</p>
+    <button disabled={busy || !available}>{busy ? 'Working…' : 'Generate 24-hour code'}</button></form>
+    {latest && <section className="panel"><h2>Share this code</h2><code className="access-code">{latest.code}</code><div className="actions"><button type="button" onClick={() => void copy()}>Copy code</button></div><p>Copy now. Plaintext codes cannot be retrieved later.{latest.expiresAtMs ? ` Expires ${new Date(latest.expiresAtMs).toLocaleString()}.` : ' Valid for 24 hours from creation.'}</p></section>}
+    {eventId && <section className="panel"><h2>Issued codes</h2><QueryFeedback state={codes} />{!codes.loading && !codes.error && !codes.items.length && <p>No codes issued for this event.</p>}
+      <div className="list">{codes.items.map(code => { const status = accessCodeStatus(code, now); return <article className="item" key={code.id}><div><strong>{code.scope === 'group' ? groups.items.find(g => g.id === code.groupId)?.name ?? 'Group membership' : 'Event membership'}</strong><p>{code.usedCount ?? 0}{code.maxUses > 0 ? ` / ${code.maxUses}` : ''} joins · Expires {code.expiresAt?.toDate?.().toLocaleString() ?? 'Unavailable'} · <span className="badge">{status}</span></p></div><button type="button" disabled={busy || status === 'Revoked' || status === 'Expired'} onClick={() => void revoke(code.id)}>Revoke</button></article>; })}</div>
+    </section>}{error && <p role="alert" className="error">{error}</p>}{notice && <p role="status">{notice}</p>}
   </div>;
 }

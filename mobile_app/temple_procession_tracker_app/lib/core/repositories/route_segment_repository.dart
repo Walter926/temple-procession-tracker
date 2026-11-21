@@ -7,9 +7,8 @@ class RouteSegmentRepository {
 
   final FirebaseFirestore _firestore;
 
-  RouteSegmentRepository({
-    FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+  RouteSegmentRepository({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _collection {
     return _firestore.collection(collectionName);
@@ -30,9 +29,7 @@ class RouteSegmentRepository {
   }
 
   Future<void> update(RouteSegment routeSegment) async {
-    await _collection
-        .doc(routeSegment.id)
-        .update(routeSegment.toFirestore());
+    await _collection.doc(routeSegment.id).update(routeSegment.toFirestore());
   }
 
   Future<void> delete(String routeSegmentId) async {
@@ -55,7 +52,7 @@ class RouteSegmentRepository {
         .orderBy('order')
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map(RouteSegment.fromFirestore).toList();
-    });
+          return snapshot.docs.map(RouteSegment.fromFirestore).toList();
+        });
   }
 }

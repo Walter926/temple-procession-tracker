@@ -4,6 +4,9 @@
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "test": "npm run build && node --test lib/*.test.js",
+    "preflight": "node ../scripts/check-deployment.mjs",
+    "test:rules": "npm run build && firebase emulators:exec --config ../firebase.json --project demo-temple-procession --only firestore,database,auth \"node --test --test-concurrency=1 lib/*.test.js test/*.test.mjs\"",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
@@ -19,12 +22,15 @@
     "firebase-functions": "^7.0.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.57.0",
     "eslint-config-google": "^0.14.0",
     "eslint-plugin-import": "^2.25.4",
+    "firebase": "^13.4.0",
     "firebase-functions-test": "^3.4.1",
+    "firebase-tools": "^15.36.0",
     "typescript": "^6.0.0"
   },
   "private": true

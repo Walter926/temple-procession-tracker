@@ -24,6 +24,16 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Permissions-Policy", "value": "geolocation=(self), camera=(), microphone=()" }
+        ]
+      }
+    ],
     "rewrites": [
       {
         "source": "**",
@@ -40,5 +50,13 @@
   },
   "storage": {
     "rules": "firebase_rules/storage.rules"
+  },
+  "emulators": {
+    "auth": { "host": "127.0.0.1", "port": 9099 },
+    "functions": { "host": "127.0.0.1", "port": 5001 },
+    "firestore": { "host": "127.0.0.1", "port": 8080 },
+    "database": { "host": "127.0.0.1", "port": 9000 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
   }
 }

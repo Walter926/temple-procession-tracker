@@ -5,9 +5,8 @@ import 'location_service.dart';
 class ArrivalDetectionService {
   final LocationService _locationService;
 
-  ArrivalDetectionService({
-    LocationService? locationService,
-  }) : _locationService = locationService ?? LocationService();
+  ArrivalDetectionService({LocationService? locationService})
+    : _locationService = locationService ?? LocationService();
 
   bool isArrivedAtStopPoint({
     required LocationUpdate locationUpdate,

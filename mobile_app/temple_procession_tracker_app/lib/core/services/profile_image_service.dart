@@ -10,8 +10,8 @@ class ProfileImageService {
   final ImagePicker _imagePicker;
 
   ProfileImageService({FirebaseStorage? storage, ImagePicker? imagePicker})
-      : _storage = storage ?? FirebaseStorage.instance,
-        _imagePicker = imagePicker ?? ImagePicker();
+    : _storage = storage ?? FirebaseStorage.instance,
+      _imagePicker = imagePicker ?? ImagePicker();
 
   Future<String?> pickAndUploadProfileImage({required String userId}) async {
     final XFile? image = await _imagePicker.pickImage(
@@ -37,7 +37,8 @@ class ProfileImageService {
 
     final Reference reference = _storage.ref(storagePath);
 
-    final String contentType = image.mimeType != null && image.mimeType!.startsWith('image/')
+    final String contentType =
+        image.mimeType != null && image.mimeType!.startsWith('image/')
         ? image.mimeType!
         : 'image/jpeg';
 
@@ -57,7 +58,9 @@ class ProfileImageService {
     }
 
     if (authUid != userId) {
-      throw StateError('Profile user ID does not match Firebase Authentication UID.');
+      throw StateError(
+        'Profile user ID does not match Firebase Authentication UID.',
+      );
     }
 
     try {

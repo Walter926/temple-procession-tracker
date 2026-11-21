@@ -51,6 +51,7 @@ class DefaultFirebaseOptions {
     appId: '1:354671670812:web:9fffc1dfa6df40472151d9',
     messagingSenderId: '354671670812',
     projectId: 'temple-procession-walter',
+    databaseURL: 'https://temple-procession-walter-default-rtdb.firebaseio.com',
     authDomain: 'temple-procession-walter.firebaseapp.com',
     storageBucket: 'temple-procession-walter.firebasestorage.app',
     measurementId: 'G-X6M6MX9P8E',
@@ -61,6 +62,7 @@ class DefaultFirebaseOptions {
     appId: '1:354671670812:android:cf0e37351af74dda2151d9',
     messagingSenderId: '354671670812',
     projectId: 'temple-procession-walter',
+    databaseURL: 'https://temple-procession-walter-default-rtdb.firebaseio.com',
     storageBucket: 'temple-procession-walter.firebasestorage.app',
   );
 
@@ -69,6 +71,7 @@ class DefaultFirebaseOptions {
     appId: '1:354671670812:ios:48d99f3657f974a12151d9',
     messagingSenderId: '354671670812',
     projectId: 'temple-procession-walter',
+    databaseURL: 'https://temple-procession-walter-default-rtdb.firebaseio.com',
     storageBucket: 'temple-procession-walter.firebasestorage.app',
     iosBundleId: 'com.walter.templeprocessiontracker',
   );

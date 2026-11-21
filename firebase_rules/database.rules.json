@@ -12,10 +12,11 @@
     },
     "liveLocations": {
       "$eventId": {
+        ".indexOn": ["recordedAt"],
         "$groupId": {
-          ".read": "auth != null",
-          ".write": "auth != null && root.child('trackingAssignments').child($groupId).child('leaderUserId').val() === auth.uid && root.child('trackingAssignments').child($groupId).child('eventId').val() === $eventId && root.child('eventStates').child($eventId).child('status').val() === 'active'",
-          ".validate": "newData.hasChildren(['userId','latitude','longitude','accuracyMeters','speedMetersPerSecond','headingDegrees','recordedAt']) && newData.child('userId').val() === auth.uid && newData.child('latitude').isNumber() && newData.child('longitude').isNumber() && newData.child('latitude').val() >= -90 && newData.child('latitude').val() <= 90 && newData.child('longitude').val() >= -180 && newData.child('longitude').val() <= 180 && newData.child('accuracyMeters').isNumber() && newData.child('accuracyMeters').val() >= 0 && newData.child('speedMetersPerSecond').isNumber() && newData.child('headingDegrees').isNumber() && newData.child('recordedAt').isNumber() && newData.child('recordedAt').val() <= now + 60000 && newData.child('recordedAt').val() >= now - 120000",
+          ".read": "(auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true) && (root.child('accountStates').child(auth.uid).child('role').val() === 'admin' || (root.child('accountStates').child(auth.uid).child('role').val() === 'organizer' && root.child('eventStates').child($eventId).child('organizerId').val() === auth.uid) || root.child('eventAccess').child($eventId).child(auth.uid).child('allowed').val() === true || (root.child('eventStates').child($eventId).child('isPublic').val() === true && (root.child('eventStates').child($eventId).child('status').val() === 'scheduled' || root.child('eventStates').child($eventId).child('status').val() === 'active')))",
+          ".write": "auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true && root.child('accountStates').child(auth.uid).child('role').val() === 'teamLeader' && root.child('accountStates').child(auth.uid).child('assignedGroupId').val() === $groupId && root.child('trackingAssignments').child($groupId).child('leaderUserId').val() === auth.uid && root.child('trackingAssignments').child($groupId).child('eventId').val() === $eventId && root.child('eventStates').child($eventId).child('status').val() === 'active' && newData.exists()",
+          ".validate": "newData.hasChildren(['userId','latitude','longitude','accuracyMeters','speedMetersPerSecond','headingDegrees','recordedAt']) && newData.child('userId').val() === auth.uid && newData.child('latitude').isNumber() && newData.child('longitude').isNumber() && newData.child('latitude').val() >= -90 && newData.child('latitude').val() <= 90 && newData.child('longitude').val() >= -180 && newData.child('longitude').val() <= 180 && newData.child('accuracyMeters').isNumber() && newData.child('accuracyMeters').val() >= 0 && newData.child('accuracyMeters').val() <= 100 && newData.child('speedMetersPerSecond').isNumber() && newData.child('speedMetersPerSecond').val() >= 0 && newData.child('speedMetersPerSecond').val() <= 60 && newData.child('headingDegrees').isNumber() && newData.child('headingDegrees').val() >= 0 && newData.child('headingDegrees').val() <= 360 && newData.child('recordedAt').isNumber() && newData.child('recordedAt').val() <= now + 15000 && newData.child('recordedAt').val() >= now - 45000 && (!data.exists() || newData.child('recordedAt').val() > data.child('recordedAt').val())",
           "$other": {
             ".validate": false
           },
@@ -41,15 +42,15 @@
             ".validate": "newData.exists()"
           }
         },
-        ".read": "auth != null"
+        ".read": "(auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true) && (root.child('accountStates').child(auth.uid).child('role').val() === 'admin' || (root.child('accountStates').child(auth.uid).child('role').val() === 'organizer' && root.child('eventStates').child($eventId).child('organizerId').val() === auth.uid) || root.child('eventAccess').child($eventId).child(auth.uid).child('allowed').val() === true || (root.child('eventStates').child($eventId).child('isPublic').val() === true && (root.child('eventStates').child($eventId).child('status').val() === 'scheduled' || root.child('eventStates').child($eventId).child('status').val() === 'active')))"
       }
     },
     "trackingStatus": {
       "$eventId": {
         "$groupId": {
-          ".read": "auth != null",
-          ".write": "auth != null && root.child('trackingAssignments').child($groupId).child('leaderUserId').val() === auth.uid && root.child('trackingAssignments').child($groupId).child('eventId').val() === $eventId && root.child('eventStates').child($eventId).child('status').val() === 'active'",
-          ".validate": "newData.hasChildren(['userId','state','updatedAt']) && newData.child('userId').val() === auth.uid && newData.child('state').isString() && (newData.child('state').val() === 'active' || newData.child('state').val() === 'paused' || newData.child('state').val() === 'stopped') && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() <= now + 60000 && newData.child('updatedAt').val() >= now - 120000",
+          ".read": "(auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true) && (root.child('accountStates').child(auth.uid).child('role').val() === 'admin' || (root.child('accountStates').child(auth.uid).child('role').val() === 'organizer' && root.child('eventStates').child($eventId).child('organizerId').val() === auth.uid) || root.child('eventAccess').child($eventId).child(auth.uid).child('allowed').val() === true || (root.child('eventStates').child($eventId).child('isPublic').val() === true && (root.child('eventStates').child($eventId).child('status').val() === 'scheduled' || root.child('eventStates').child($eventId).child('status').val() === 'active')))",
+          ".write": "auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true && root.child('accountStates').child(auth.uid).child('role').val() === 'teamLeader' && root.child('accountStates').child(auth.uid).child('assignedGroupId').val() === $groupId && root.child('trackingAssignments').child($groupId).child('leaderUserId').val() === auth.uid && root.child('trackingAssignments').child($groupId).child('eventId').val() === $eventId && root.child('eventStates').child($eventId).child('status').val() === 'active' && newData.exists()",
+          ".validate": "newData.hasChildren(['userId','state','updatedAt']) && newData.child('userId').val() === auth.uid && (newData.child('state').val() === 'active' || newData.child('state').val() === 'paused' || newData.child('state').val() === 'stopped' || newData.child('state').val() === 'error') && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() <= now + 15000 && newData.child('updatedAt').val() >= now - 45000 && (!data.exists() || newData.child('updatedAt').val() >= data.child('updatedAt').val())",
           "$other": {
             ".validate": false
           },
@@ -62,20 +63,29 @@
           "updatedAt": {
             ".validate": "newData.exists()"
           }
-        }
+        },
+        ".read": "(auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true) && (root.child('accountStates').child(auth.uid).child('role').val() === 'admin' || (root.child('accountStates').child(auth.uid).child('role').val() === 'organizer' && root.child('eventStates').child($eventId).child('organizerId').val() === auth.uid) || root.child('eventAccess').child($eventId).child(auth.uid).child('allowed').val() === true || (root.child('eventStates').child($eventId).child('isPublic').val() === true && (root.child('eventStates').child($eventId).child('status').val() === 'scheduled' || root.child('eventStates').child($eventId).child('status').val() === 'active')))"
       }
     },
     "groupStatuses": {
       "$groupId": {
-        ".read": "auth != null",
+        ".read": "(auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true) && (root.child('accountStates').child(auth.uid).child('role').val() === 'admin' || (root.child('accountStates').child(auth.uid).child('role').val() === 'organizer' && root.child('eventStates').child(root.child('trackingAssignments').child($groupId).child('eventId').val()).child('organizerId').val() === auth.uid) || root.child('eventAccess').child(root.child('trackingAssignments').child($groupId).child('eventId').val()).child(auth.uid).child('allowed').val() === true || (root.child('eventStates').child(root.child('trackingAssignments').child($groupId).child('eventId').val()).child('isPublic').val() === true && (root.child('eventStates').child(root.child('trackingAssignments').child($groupId).child('eventId').val()).child('status').val() === 'scheduled' || root.child('eventStates').child(root.child('trackingAssignments').child($groupId).child('eventId').val()).child('status').val() === 'active')))",
         ".write": false
       }
     },
     "activeCollisionAlerts": {
       "$eventId": {
-        ".read": "auth != null",
+        ".read": "(auth != null && root.child('accountStates').child(auth.uid).child('isActive').val() === true) && (root.child('accountStates').child(auth.uid).child('role').val() === 'admin' || (root.child('accountStates').child(auth.uid).child('role').val() === 'organizer' && root.child('eventStates').child($eventId).child('organizerId').val() === auth.uid) || root.child('eventAccess').child($eventId).child(auth.uid).child('allowed').val() === true || (root.child('eventStates').child($eventId).child('isPublic').val() === true && (root.child('eventStates').child($eventId).child('status').val() === 'scheduled' || root.child('eventStates').child($eventId).child('status').val() === 'active')))",
         ".write": false
       }
+    },
+    "accountStates": {
+      ".read": false,
+      ".write": false
+    },
+    "eventAccess": {
+      ".read": false,
+      ".write": false
     }
   }
 }

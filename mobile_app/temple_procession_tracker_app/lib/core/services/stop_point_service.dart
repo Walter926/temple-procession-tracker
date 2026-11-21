@@ -4,9 +4,8 @@ import '../repositories/stop_point_repository.dart';
 class StopPointService {
   final StopPointRepository _stopPointRepository;
 
-  StopPointService({
-    StopPointRepository? stopPointRepository,
-  }) : _stopPointRepository = stopPointRepository ?? StopPointRepository();
+  StopPointService({StopPointRepository? stopPointRepository})
+    : _stopPointRepository = stopPointRepository ?? StopPointRepository();
 
   Future<void> createStopPoint(StopPoint stopPoint) async {
     await _stopPointRepository.create(stopPoint);

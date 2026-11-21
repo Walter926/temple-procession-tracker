@@ -3,12 +3,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../enums/user_role.dart';
 import '../models/user_profile.dart';
 import '../repositories/user_repository.dart';
+import '../utils/role_access.dart';
 
 class AuthService {
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
+  Future<void> Function()? onBeforeSignOut;
 
-  AuthService({FirebaseAuth? firebaseAuth, UserRepository? userRepository}) : _auth = firebaseAuth ?? FirebaseAuth.instance, _userRepository = userRepository ?? UserRepository();
+  AuthService({FirebaseAuth? firebaseAuth, UserRepository? userRepository})
+    : _auth = firebaseAuth ?? FirebaseAuth.instance,
+      _userRepository = userRepository ?? UserRepository();
 
   User? get currentFirebaseUser {
     return _auth.currentUser;
@@ -28,12 +32,21 @@ class AuthService {
     return _userRepository.read(firebaseUser.uid);
   }
 
-  Future<UserProfile> signUp({required String email, required String password, required String displayName, UserRole role = UserRole.teamMember}) async {
-    if (role != UserRole.teamMember) {
-      throw ArgumentError('Self-registration must use the teamMember role.');
+  Future<UserProfile> signUp({
+    required String email,
+    required String password,
+    required String displayName,
+    UserRole role = UserRole.teamMember,
+  }) async {
+    if (!RoleAccess.registrationRoles.contains(role)) {
+      throw ArgumentError('Choose organizer, team leader, or team member.');
     }
 
-    final UserCredential credential = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
+    final UserCredential credential = await _auth
+        .createUserWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
     final User? firebaseUser = credential.user;
 
     if (firebaseUser == null) {
@@ -46,7 +59,7 @@ class AuthService {
       id: firebaseUser.uid,
       email: email.trim(),
       displayName: displayName.trim(),
-      role: UserRole.teamMember,
+      role: role,
       photoUrl: firebaseUser.photoURL,
       phoneNumber: firebaseUser.phoneNumber,
       isActive: true,
@@ -63,19 +76,32 @@ class AuthService {
     return userProfile;
   }
 
-  Future<UserProfile> signIn({required String email, required String password}) async {
-    final UserCredential credential = await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+  Future<UserProfile> signIn({
+    required String email,
+    required String password,
+  }) async {
+    final UserCredential credential = await _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
     final User? firebaseUser = credential.user;
 
     if (firebaseUser == null) {
       throw StateError('Firebase user was not returned after sign in.');
     }
 
-    final UserProfile? userProfile = await _userRepository.read(firebaseUser.uid);
+    final UserProfile? userProfile = await _userRepository.read(
+      firebaseUser.uid,
+    );
 
     if (userProfile == null) {
       await _auth.signOut();
       throw StateError('The account does not have an application profile.');
+    }
+
+    if (!userProfile.isActive) {
+      await signOut();
+      throw StateError('This account is inactive. Contact an administrator.');
     }
 
     return userProfile;
@@ -86,6 +112,7 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    await onBeforeSignOut?.call();
     await _auth.signOut();
   }
 }

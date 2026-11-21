@@ -5,10 +5,9 @@ import 'arrival_detection_service.dart';
 class RouteProgressService {
   final ArrivalDetectionService _arrivalDetectionService;
 
-  RouteProgressService({
-    ArrivalDetectionService? arrivalDetectionService,
-  }) : _arrivalDetectionService =
-            arrivalDetectionService ?? ArrivalDetectionService();
+  RouteProgressService({ArrivalDetectionService? arrivalDetectionService})
+    : _arrivalDetectionService =
+          arrivalDetectionService ?? ArrivalDetectionService();
 
   int countArrivedStopPoints({
     required LocationUpdate locationUpdate,

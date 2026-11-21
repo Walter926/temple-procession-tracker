@@ -6,7 +6,8 @@ import '../utils/role_access.dart';
 class UserRoleService {
   final UserRepository _userRepository;
 
-  UserRoleService({UserRepository? userRepository}) : _userRepository = userRepository ?? UserRepository();
+  UserRoleService({UserRepository? userRepository})
+    : _userRepository = userRepository ?? UserRepository();
 
   Future<UserRole> getRoleForUser(String userId) async {
     final UserProfile? userProfile = await _userRepository.read(userId);
@@ -48,8 +49,12 @@ class UserRoleService {
     return canManageEvents(role);
   }
 
-  Future<void> updateUserRole({required UserProfile userProfile, required UserRole newRole}) async {
-    final UserProfile updatedProfile = UserProfile(id: userProfile.id,
+  Future<void> updateUserRole({
+    required UserProfile userProfile,
+    required UserRole newRole,
+  }) async {
+    final UserProfile updatedProfile = UserProfile(
+      id: userProfile.id,
       email: userProfile.email,
       displayName: userProfile.displayName,
       role: newRole,

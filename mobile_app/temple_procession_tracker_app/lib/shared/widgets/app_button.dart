@@ -6,7 +6,13 @@ class AppButton extends StatelessWidget {
   final IconData? icon;
   final bool isLoading;
 
-  const AppButton({super.key, required this.label, required this.onPressed, this.icon, this.isLoading = false});
+  const AppButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.isLoading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +25,11 @@ class AppButton extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (isLoading) ...[
-            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
             const SizedBox(width: 10),
           ] else if (icon != null) ...[
             Icon(icon),

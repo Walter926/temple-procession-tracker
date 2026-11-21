@@ -32,8 +32,8 @@ export interface GroupRecord {
   lastLocationUpdateAt: Timestamp | null; statusUpdatedAt?: Timestamp | null; accessCodeId: string | null; memberCount: number;
 }
 export interface ManagementUserRecord {
-  id: string; displayName: string; email: string; photoUrl?: string | null;
-  role: string; isActive: boolean; assignedGroupId?: string;
+  id: string; displayName: string; fullName?: string; email: string; photoUrl?: string | null;
+  role: string; isActive: boolean; assignedGroupId?: string; isEligible?: boolean; profileMissing?: boolean;
 }
 export interface AccessCodeRecord {
   id: string; eventId: string; groupId: string; scope: 'event' | 'group';

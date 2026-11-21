@@ -6,9 +6,8 @@ import '../repositories/location_repository.dart';
 class LocationService {
   final LocationRepository _locationRepository;
 
-  LocationService({
-    LocationRepository? locationRepository,
-  }) : _locationRepository = locationRepository ?? LocationRepository();
+  LocationService({LocationRepository? locationRepository})
+    : _locationRepository = locationRepository ?? LocationRepository();
 
   Future<bool> isLocationServiceEnabled() async {
     return Geolocator.isLocationServiceEnabled();
@@ -16,9 +15,7 @@ class LocationService {
 
   Future<Position> getCurrentPosition() async {
     return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
   }
 
@@ -29,7 +26,7 @@ class LocationService {
     required Position position,
     int? batteryLevel,
   }) {
-    final now = DateTime.now();
+    final now = position.timestamp;
 
     return LocationUpdate(
       id: '${groupId}_${now.millisecondsSinceEpoch}',
