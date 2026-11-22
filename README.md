@@ -1,6 +1,6 @@
 # Temple Procession Tracker
 
-Android procession tracking, an organizer/admin web dashboard, and a trusted Firebase backend. The pre-merge upgrade was locally implemented and tested; incoming additions have not yet been revalidated together. This is **not a deployed or field-certified release**. See the latest [bug repair and deployment report](docs/BUG_FIX_REPORT.md), the earlier [upgrade status](docs/UPGRADE_STATUS.md), and [operations/runbook](docs/OPERATIONS.md).
+Temple Procession Tracker brings event planning, group coordination, and live procession tracking together in an Android app, an organizer/admin web dashboard, and a Firebase backend with role-based access.
 
 ## Project layout
 
@@ -11,27 +11,28 @@ Android procession tracking, an organizer/admin web dashboard, and a trusted Fir
 
 The stack is Flutter/Dart with Google Maps and Geolocator, React 19/TypeScript/Vite 8, and Firebase Authentication, Firestore, Realtime Database, Cloud Functions v2 (Node.js 24), Cloud Messaging and Storage. The source repository is [Walter926/temple-procession-tracker](https://github.com/Walter926/temple-procession-tracker).
 
-## Feature and phase status
+## Features
 
-Role-aware authentication, event/route/stop/group management, trusted access-code redemption, assigned-primary foreground tracking, authorized maps, server-derived arrivals/progress/approximate ETA, collision advice and scoped notifications are covered by the pre-merge implementation reports. Code presence and local tests do not establish deployed availability.
+- Role-aware authentication for event managers, assigned leaders, members, and public visitors.
+- Event planning, route drawing, ordered stops, group management, and leader assignments.
+- Six-digit membership codes with a 24-hour lifetime and configurable usage limits.
+- Live maps, foreground GPS tracking, route progress, arrival updates, approximate ETA, and recorded paths.
+- Collision advice, event/group announcements, in-app notifications, and instruction acknowledgements.
+- Server-side authorization, membership transactions, retryable notification delivery, and scheduled maintenance.
 
-The Phase 37–41 labels below follow the incoming MVP roadmap; the later upgrade inventory uses a separate numbering scheme. Its older Phase 31-only status does not supersede the more recent reports.
+## Documentation
 
-| Incoming phase | Current evidence and remaining gate |
-| --- | --- |
-| 37 — Notifications | Pre-merge implementation includes scoped in-app records, instruction acknowledgements and retryable push delivery. Real FCM receipt and device permission/background behavior still require acceptance testing. |
-| 38 — Location history | The existing exported [progress handler](functions/src/route_progress.ts) records trusted history at most once per 15 seconds; the live-map page includes recorded paths. Incoming standalone history code is not an enabled replacement for that path. |
-| 39 — MVP regression | Local regression and browser results are recorded in the bug repair report. They predate this merge; rerun the relevant checks after all conflicts are resolved. |
-| 40 — Android field testing | The 2–4-phone GPS, crowding, network, stale-location and battery acceptance suite remains a release gate. Emulator checks or a single-device debug installation do not complete it. |
-| 41 — Documentation and release | Setup/runbook documentation and actual local dashboard screenshots exist. A signed release, Git tag/GitHub MVP release and real end-to-end phone demo video remain gated on acceptance. |
-
-In the current [dashboard routing](admin_dashboard/src/App.tsx), the incoming [Location History](admin_dashboard/src/pages/LocationHistoryPage.tsx), [Notifications](admin_dashboard/src/pages/NotificationsPage.tsx) and [Settings](admin_dashboard/src/pages/SettingsPage.tsx) components are not wired as pages; `/settings` redirects to `/events`. The incoming [history module](functions/src/location_history.ts) defines a separate 30-second-bucket writer, but it is not exported by the [Functions entry point](functions/src/index.ts). These source additions have not been validated as integrated features and must not be advertised as enabled routes or deployed handlers.
+- [Operations and configuration](docs/OPERATIONS.md)
+- [Android app setup](mobile_app/temple_procession_tracker_app/README.md)
+- [Dashboard setup](admin_dashboard/README.md)
+- [Verification and deployment report](docs/BUG_FIX_REPORT.md)
+- [Technical upgrade history](docs/UPGRADE_STATUS.md)
 
 ## Setup
 
 Validated with Node 24.22.1, Java 21, Flutter 3.44.2 or 3.44.9/Dart 3.12.2, Android platform 36 and the repository's Gradle/AGP versions. Use the lockfiles. Newer Flutter versions may require a separate Gradle/plugin migration; do not upgrade only one part of that toolchain.
 
-Install Git, Firebase CLI and Android Studio/SDK for local development. Use a Google Play-enabled Android emulator for relevant device checks; it does not replace physical-phone acceptance.
+Install Git, Firebase CLI and Android Studio/SDK for local development. Use a Google Play-enabled Android emulator for development and physical phones for GPS, connectivity, and multi-device checks.
 
 Select Flutter **3.44.2 or 3.44.9** explicitly: both use Dart 3.12.2 and pass the verification guard with the existing lockfile. Flutter 3.50 requires newer Gradle and a Material migration and is not the configured Android toolchain. Do not bypass build-dependency validation. The verification script accepts `-FlutterCommand 'C:/path/to/flutter/bin/flutter.bat'`; `-NoPub` is available when dependencies are already resolved (including Windows hosts without desktop-plugin symlink support).
 
@@ -45,7 +46,7 @@ flutter doctor -v
 flutter pub get
 ```
 
-On Windows, Flutter's desktop plugin symlink step can require Developer Mode. This is an OS configuration choice; it was not enabled automatically during this upgrade. Android verification succeeded with resolved packages and `--no-pub`.
+On Windows, Flutter's desktop plugin symlink step can require Developer Mode. After package resolution, Android verification can use `--no-pub`.
 
 1. Check [.firebaserc](.firebaserc), Android Firebase configuration and [Flutter Firebase options](mobile_app/temple_procession_tracker_app/lib/firebase_options.dart). Current target: `temple-procession-walter`, Functions region: `us-central1`.
 2. Copy the dashboard [.env.example](admin_dashboard/.env.example) to a local environment file and supply your Firebase web configuration and restricted browser Maps key. Never put service-account credentials in browser variables.
@@ -56,9 +57,9 @@ On Windows, Flutter's desktop plugin symlink step can require Developer Mode. Th
 
 These local environment, Maps and signing files are ignored by Git. Public Firebase client identifiers are not privileged credentials. Enforce security through rules, API restrictions and App Check, not hidden web configuration.
 
-Enable Maps SDK for Android and Maps JavaScript API in the intended Google Cloud project, and verify billing/API availability. Set `VITE_GOOGLE_MAPS_BROWSER_KEY` for the dashboard and restrict it to approved HTTP referrers (including the local development origin if needed). Android uses the existing Gradle/manifest `MAPS_API_KEY` substitution, not a hard-coded browser key. A successful build does not prove Maps key authorization or tile rendering.
+Enable Maps SDK for Android and Maps JavaScript API in the intended Google Cloud project, and verify billing/API availability. Set `VITE_GOOGLE_MAPS_BROWSER_KEY` for the dashboard and restrict it to approved HTTP referrers (including the local development origin if needed). Android uses the Gradle/manifest `MAPS_API_KEY` substitution with a separate Android-restricted key. Authorize the package name and each build's signing certificate so map tiles can load on the device.
 
-Android 13+ notification presentation requires notification permission; leader tracking also requires foreground location permission. Simulated emulator routes are useful for local checks, but do not establish real GPS, radio or multi-device reliability. Never commit private service-account JSON, FCM tokens or signing material.
+Android 13+ notification presentation requires notification permission; leader tracking also requires foreground location permission. Include physical-phone GPS, connectivity, and multi-device checks in event preparation. Never commit private service-account JSON, FCM tokens or signing material.
 
 ## Permissions
 
@@ -96,11 +97,11 @@ node scripts/check-deployment.mjs
 node scripts/check-deployment.mjs --release
 ```
 
-Or run `npm run lint`, `npm test` in each Node project, `npm run build` in the dashboard, and `flutter analyze`, `flutter test`, `flutter build apk --debug` in the app. `npm run test:rules` in Functions starts local Auth/Firestore/RTDB emulators, builds handlers and runs both rules and workflow tests. It uses the fixed **demo** project and resets that demo dataset; do not share it with a running demo preview. No FCM or Storage emulator result is implied.
+Or run `npm run lint`, `npm test` in each Node project, `npm run build` in the dashboard, and `flutter analyze`, `flutter test`, `flutter build apk --debug` in the app. `npm run test:rules` in Functions starts local Auth/Firestore/RTDB emulators, builds handlers and runs both rules and workflow tests. It uses the fixed **demo** project and resets that demo dataset; do not share it with a running demo preview. Check FCM delivery and Storage access separately in the configured Firebase environment.
 
-Latest verification and remaining release gates are recorded in [BUG_FIX_REPORT.md](docs/BUG_FIX_REPORT.md). The release preflight checks local prerequisites, not deployed state or Google Maps console restrictions. Authenticated, read-only live inspection is available through `node scripts/diagnose-live.mjs --maps --rules`; it does not print credentials or change resources.
+Verification records and deployment procedures are documented in [BUG_FIX_REPORT.md](docs/BUG_FIX_REPORT.md). The release preflight checks local prerequisites. Inspect deployed configuration and Google Maps authorization separately with `node scripts/diagnose-live.mjs --maps --rules`; this authenticated, read-only check keeps credentials private and leaves resources unchanged.
 
-For a future authorized rollout, follow that report's selective deployment plan: confirm the project, review backups/current grants and wait for required indexes to be READY before enabling new queries. Do not use the incoming guide's blanket Functions/rules deployment sequence or relax rules to make a demo work. Tracking mirrors/rules migration and production field testing remain separate gates.
+For deployment, follow the report's selective rollout plan: confirm the project, review backups and current grants, and wait for required indexes to be READY before enabling new queries. Coordinate tracking mirrors and security rules together, preserve access controls, and follow the runbook's device and operational checks.
 
 ## Local demonstration
 
@@ -114,27 +115,27 @@ $env:GCLOUD_PROJECT='demo-temple-procession'
 node scripts/seed-demo.mjs
 ```
 
-Set dashboard emulator mode and demo Firebase configuration (`VITE_FIREBASE_PROJECT_ID=demo-temple-procession`, database `https://demo-temple-procession-default-rtdb.firebaseio.com`; a nonempty demo API key/app ID suffices for local Auth). Then run `npm run dev`. The seed script refuses production endpoints. Demo-only accounts: `demo-owner@example.test` and `demo-admin@example.test`, password `EmulatorOnly!2026`. They do not exist in production.
+Set dashboard emulator mode and demo Firebase configuration (`VITE_FIREBASE_PROJECT_ID=demo-temple-procession`, database `https://demo-temple-procession-default-rtdb.firebaseio.com`; a nonempty demo API key/app ID suffices for local Auth). Then run `npm run dev`. The seed script refuses production endpoints. Demo-only accounts: `demo-owner@example.test` and `demo-admin@example.test`, password `EmulatorOnly!2026`. These accounts are scoped to the local demo emulators.
 
-The read-only screenshot demonstration used Auth, Firestore and RTDB emulators. To exercise dashboard callable buttons, also start the Functions emulator on port 5001 with `RTDB_URL` set to the demo database and build handlers first. The automated workflow suite invokes real handlers against local services directly; it does not certify HTTP deployment.
+The screenshot demonstration uses Auth, Firestore and RTDB emulators. To exercise dashboard callable buttons, also start the Functions emulator on port 5001 with `RTDB_URL` set to the demo database and build handlers first. The automated workflow suite invokes real handlers against these local services.
 
-Actual emulator-backed dashboard screenshots (no production data or live Maps claim):
+Dashboard screenshots using disposable emulator data:
 
 ![Organizer event list](docs/screenshots/dashboard-events.png)
 
 ![Collision route suggestions](docs/screenshots/dashboard-route-suggestions.png)
 
-## Scope and release
+## Operating guidance
 
 Supported event size: 20 routes, 100 groups, 400 stops; up to 200 stops/segments per route and 2,000 geometry points. Notification fan-out uses cursor pages of 100; leader lookup uses pages of 200. See the runbook for retention and atomic deletion limits.
 
-The final optimization pass adds versioned route caching, event-local/sparse collision processing, immediate resumable notification fan-out, fair indexed retention/maintenance, bounded live dashboard cursor pages and cached/incremental map rendering. Deployment indexes, migration cautions, configured capacity and monitoring are documented in the [optimization runbook](docs/OPERATIONS.md#optimization-rollout-and-capacity). Local regressions do not substitute for production load, native performance or battery testing.
+Performance features include versioned route caching, event-local/sparse collision processing, resumable notification fan-out, indexed retention/maintenance, bounded dashboard cursor pages, and incremental map rendering. Indexes, migration procedures, configured capacity, monitoring, and load/device checks are documented in the [optimization runbook](docs/OPERATIONS.md#optimization-rollout-and-capacity).
 
-Treat stale positions as old observations, not current locations. GPS-derived crowding alerts are advisory, not authoritative occupancy counts or emergency guarantees. FCM is best-effort and must not be the sole channel for urgent instructions. Real demo footage and any additional screenshots must use disposable test events and omit private identifiers, access codes and precise private locations; no placeholder video or unverified image links are provided.
+Treat stale positions as old observations, not current locations. GPS-derived crowding alerts are advisory, not authoritative occupancy counts or emergency guarantees. FCM is best-effort and must not be the sole channel for urgent instructions. Demo footage and screenshots should use disposable test events and omit private identifiers, access codes, and precise private locations.
 
-Continuous screen-off Android tracking needs a separately designed foreground/background service and physical-device testing. It is not promised by navigation-safe foreground tracking. iOS release work and the Phase 42+ website remain separate stages. No production deployment, signed release, Git tag or phone demo footage was created by this upgrade.
+GPS publishing runs while the Android app is in the foreground and continues across app-page navigation. Keep the app visible during active tracking; screen-off/background publishing is outside this foreground tracking mode.
 
-The existing iOS project is not an accepted iOS release. It needs macOS/Xcode/CocoaPods, Apple signing, Firebase/iOS registration, Maps configuration, platform permissions and APNs/FCM integration, followed by simulator and physical-device checks. Android verification does not establish iOS behavior.
+Android is the primary mobile target. The iOS project uses a separate platform setup: macOS/Xcode/CocoaPods, Apple signing, Firebase/iOS registration, Maps configuration, platform permissions, and APNs/FCM integration, with simulator and physical-device checks for that configuration.
 
 ## License
 

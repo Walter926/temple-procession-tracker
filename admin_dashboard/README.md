@@ -1,75 +1,48 @@
-# React + TypeScript + Vite
+# Temple Procession Tracker — Web dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A role-aware web dashboard for planning processions, coordinating groups, and following event activity. Built with React, TypeScript, Vite, and Firebase.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Event, route, stop, and group management.
+- Leader assignments, six-digit membership codes, and event/group announcements.
+- Live maps, recorded paths, collision alerts, and route suggestions.
+- Administrator account management and organizer-owned event access.
+- An access-code page scoped to the assigned primary leader's own group.
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Use Node.js 24 and the checked-in lockfile. From this directory:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+npm ci
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Copy [.env.example](.env.example) to `.env.local` and fill in the Firebase web configuration, Realtime Database URL, and browser Maps key. Match the Firebase project and Functions region to the [root configuration](../README.md#setup); the configured region is `us-central1`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Enable Maps JavaScript API and restrict the browser key to the dashboard's approved HTTP referrers, including the development origin when testing locally. Use a separate Android-restricted key for the mobile app. Keep service-account credentials out of browser configuration.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Start the development server:
 
+```sh
+npm run dev
 ```
+
+Open the address printed by Vite and sign in with an active account. Admins manage all events, organizers manage their own events, and assigned primary leaders use the access-code page for their group.
+
+## Verification and build
+
+```sh
+npm run lint
+npm test
+npm run build
+npm run preview
+```
+
+The production bundle is written to `dist/`. Firebase Hosting uses this directory, as configured in [firebase.json](../firebase.json). Review the [operations runbook](../docs/OPERATIONS.md) before publishing to the configured project.
+
+## Local emulators
+
+Set `VITE_USE_FIREBASE_EMULATORS=true` and use the demo project configuration from the [local demonstration guide](../README.md#local-demonstration). Start the Auth, Firestore, Realtime Database, and Functions emulators before using dashboard actions. Keep demo data separate from the live Firebase project.
+
+See the [main README](../README.md) for the shared permission policy, configuration, and operating guidance.

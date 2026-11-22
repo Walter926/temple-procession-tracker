@@ -689,6 +689,37 @@ test('leader directory uses bounded cursor pages and enforces event ownership', 
   assert.equal(second.users.some(user => first.users.some(previous => previous.id === user.id)), false);
 });
 
+test('admin account activation through the dashboard payload re-enables Auth and profile without restoring revoked GPS rights', async () => {
+  const f = await assignedFixture(), uid = f.leader, original = await read(`users/${uid}`);
+  const payload = { operation: 'update', uid, email: original.email, displayName: original.displayName, role: original.role, isActive: false };
+  await call(accounts.manageAccount, f.admin, payload);
+  assert.equal((await read(`users/${uid}`)).isActive, false);
+  assert.equal((await auth.getUser(uid)).disabled, true);
+  assert.equal((await rtdb.ref(`accountStates/${uid}/isActive`).get()).val(), false);
+  for (const unauthorized of [undefined, f.owner, f.member, uid]) {
+    await rejects(call(accounts.manageAccount, unauthorized, { ...payload, isActive: true }), unauthorized ? 'permission-denied' : 'unauthenticated');
+  }
+  const result = await call(accounts.manageAccount, f.admin, { ...payload, isActive: true });
+  assert.deepEqual(result, { uid, action: 'update' });
+  const profile = await read(`users/${uid}`), login = await auth.getUser(uid);
+  assert.equal(profile.isActive, true);
+  assert.equal(profile.role, original.role);
+  assert.equal(profile.email, original.email);
+  assert.equal(profile.displayName, original.displayName);
+  assert.equal(profile.authMetadataPending, undefined);
+  assert.equal(login.disabled, false);
+  assert.equal(login.email, original.email);
+  assert.equal(profile.assignedGroupId, '');
+  assert.equal((await read(`groups/${f.group}`)).leaderUserId, '');
+  assert.equal((await rtdb.ref(`accountStates/${uid}/isActive`).get()).val(), true);
+  assert.equal((await rtdb.ref(`accountStates/${uid}/assignedGroupId`).get()).val(), '');
+  await call(accounts.manageAccount, f.admin, { ...payload, isActive: true });
+  assert.equal((await read(`users/${uid}`)).isActive, true);
+  assert.equal((await auth.getUser(uid)).disabled, false);
+  await rejects(call(accounts.manageAccount, f.admin, { operation: 'update', uid: f.admin, isActive: false }), 'failed-precondition');
+  assert.equal((await read(`users/${f.admin}`)).isActive, true);
+});
+
 test('admin account creation, Auth metadata edits and repeat-safe deletion keep personal records consistent', async () => {
   const f = await fixture(), uid = `${f.event}-managed`, email = `${uid}@example.test`;
   await rejects(call(accounts.manageAccount, f.owner, { action: 'create', email, password, displayName: 'Managed', role: 'teamMember' }), 'permission-denied');
