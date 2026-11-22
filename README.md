@@ -1,6 +1,6 @@
 # Temple Procession Tracker
 
-Android procession tracking, an organizer/admin web dashboard, and a trusted Firebase backend. This upgrade is locally implemented and tested; it is **not a deployed or field-certified release**. See the latest [bug repair and deployment report](docs/BUG_FIX_REPORT.md), the earlier [upgrade status](docs/UPGRADE_STATUS.md), and [operations/runbook](docs/OPERATIONS.md).
+Android procession tracking, an organizer/admin web dashboard, and a trusted Firebase backend. The pre-merge upgrade was locally implemented and tested; incoming additions have not yet been revalidated together. This is **not a deployed or field-certified release**. See the latest [bug repair and deployment report](docs/BUG_FIX_REPORT.md), the earlier [upgrade status](docs/UPGRADE_STATUS.md), and [operations/runbook](docs/OPERATIONS.md).
 
 ## Project layout
 
@@ -9,9 +9,29 @@ Android procession tracking, an organizer/admin web dashboard, and a trusted Fir
 - [Cloud Functions](functions/src/): authorization, validated management, membership transactions, tracking processing, retryable notifications and scheduled maintenance.
 - [Security rules and indexes](firebase_rules/), [verification/branding scripts](scripts/), and [original supplied icon](assets/branding/temple-icon.png).
 
+The stack is Flutter/Dart with Google Maps and Geolocator, React 19/TypeScript/Vite 8, and Firebase Authentication, Firestore, Realtime Database, Cloud Functions v2 (Node.js 24), Cloud Messaging and Storage. The source repository is [Walter926/temple-procession-tracker](https://github.com/Walter926/temple-procession-tracker).
+
+## Feature and phase status
+
+Role-aware authentication, event/route/stop/group management, trusted access-code redemption, assigned-primary foreground tracking, authorized maps, server-derived arrivals/progress/approximate ETA, collision advice and scoped notifications are covered by the pre-merge implementation reports. Code presence and local tests do not establish deployed availability.
+
+The Phase 37–41 labels below follow the incoming MVP roadmap; the later upgrade inventory uses a separate numbering scheme. Its older Phase 31-only status does not supersede the more recent reports.
+
+| Incoming phase | Current evidence and remaining gate |
+| --- | --- |
+| 37 — Notifications | Pre-merge implementation includes scoped in-app records, instruction acknowledgements and retryable push delivery. Real FCM receipt and device permission/background behavior still require acceptance testing. |
+| 38 — Location history | The existing exported [progress handler](functions/src/route_progress.ts) records trusted history at most once per 15 seconds; the live-map page includes recorded paths. Incoming standalone history code is not an enabled replacement for that path. |
+| 39 — MVP regression | Local regression and browser results are recorded in the bug repair report. They predate this merge; rerun the relevant checks after all conflicts are resolved. |
+| 40 — Android field testing | The 2–4-phone GPS, crowding, network, stale-location and battery acceptance suite remains a release gate. Emulator checks or a single-device debug installation do not complete it. |
+| 41 — Documentation and release | Setup/runbook documentation and actual local dashboard screenshots exist. A signed release, Git tag/GitHub MVP release and real end-to-end phone demo video remain gated on acceptance. |
+
+In the current [dashboard routing](admin_dashboard/src/App.tsx), the incoming [Location History](admin_dashboard/src/pages/LocationHistoryPage.tsx), [Notifications](admin_dashboard/src/pages/NotificationsPage.tsx) and [Settings](admin_dashboard/src/pages/SettingsPage.tsx) components are not wired as pages; `/settings` redirects to `/events`. The incoming [history module](functions/src/location_history.ts) defines a separate 30-second-bucket writer, but it is not exported by the [Functions entry point](functions/src/index.ts). These source additions have not been validated as integrated features and must not be advertised as enabled routes or deployed handlers.
+
 ## Setup
 
 Validated with Node 24.22.1, Java 21, Flutter 3.44.2 or 3.44.9/Dart 3.12.2, Android platform 36 and the repository's Gradle/AGP versions. Use the lockfiles. Newer Flutter versions may require a separate Gradle/plugin migration; do not upgrade only one part of that toolchain.
+
+Install Git, Firebase CLI and Android Studio/SDK for local development. Use a Google Play-enabled Android emulator for relevant device checks; it does not replace physical-phone acceptance.
 
 Select Flutter **3.44.2 or 3.44.9** explicitly: both use Dart 3.12.2 and pass the verification guard with the existing lockfile. Flutter 3.50 requires newer Gradle and a Material migration and is not the configured Android toolchain. Do not bypass build-dependency validation. The verification script accepts `-FlutterCommand 'C:/path/to/flutter/bin/flutter.bat'`; `-NoPub` is available when dependencies are already resolved (including Windows hosts without desktop-plugin symlink support).
 
@@ -21,6 +41,7 @@ npm ci
 cd ../admin_dashboard
 npm ci
 cd ../mobile_app/temple_procession_tracker_app
+flutter doctor -v
 flutter pub get
 ```
 
@@ -28,12 +49,16 @@ On Windows, Flutter's desktop plugin symlink step can require Developer Mode. Th
 
 1. Check [.firebaserc](.firebaserc), Android Firebase configuration and [Flutter Firebase options](mobile_app/temple_procession_tracker_app/lib/firebase_options.dart). Current target: `temple-procession-walter`, Functions region: `us-central1`.
 2. Copy the dashboard [.env.example](admin_dashboard/.env.example) to a local environment file and supply your Firebase web configuration and restricted browser Maps key. Never put service-account credentials in browser variables.
-3. Set `RTDB_URL` in the Functions project environment, using [the example](functions/.env.example). All three clients must use the same database/project.
+3. Set `RTDB_URL` in the Functions project environment, using [the example](functions/.env.example), and set the dashboard's `VITE_FIREBASE_DATABASE_URL` to the same database URL. All three clients must use the same database/project; verify the URL in Firebase Console.
 4. Create Android local `secrets.properties` containing `MAPS_API_KEY=...`. Restrict this key to package `com.walter.templeprocessiontracker` and the correct certificate fingerprints; use a separate HTTP-referrer-restricted browser key.
 5. For a signed release, supply Android local `key.properties` with `storeFile`, `storePassword`, `keyAlias`, and `keyPassword`. Release tasks intentionally fail without these values; no debug-signed release fallback exists.
 6. Bootstrap the first admin through a trusted Firebase Admin operation. Self-registration permits only organizer, team leader or team member. Do not change client rules to create an admin.
 
 These local environment, Maps and signing files are ignored by Git. Public Firebase client identifiers are not privileged credentials. Enforce security through rules, API restrictions and App Check, not hidden web configuration.
+
+Enable Maps SDK for Android and Maps JavaScript API in the intended Google Cloud project, and verify billing/API availability. Set `VITE_GOOGLE_MAPS_BROWSER_KEY` for the dashboard and restrict it to approved HTTP referrers (including the local development origin if needed). Android uses the existing Gradle/manifest `MAPS_API_KEY` substitution, not a hard-coded browser key. A successful build does not prove Maps key authorization or tile rendering.
+
+Android 13+ notification presentation requires notification permission; leader tracking also requires foreground location permission. Simulated emulator routes are useful for local checks, but do not establish real GPS, radio or multi-device reliability. Never commit private service-account JSON, FCM tokens or signing material.
 
 ## Permissions
 
@@ -75,6 +100,8 @@ Or run `npm run lint`, `npm test` in each Node project, `npm run build` in the d
 
 Latest verification and remaining release gates are recorded in [BUG_FIX_REPORT.md](docs/BUG_FIX_REPORT.md). The release preflight checks local prerequisites, not deployed state or Google Maps console restrictions. Authenticated, read-only live inspection is available through `node scripts/diagnose-live.mjs --maps --rules`; it does not print credentials or change resources.
 
+For a future authorized rollout, follow that report's selective deployment plan: confirm the project, review backups/current grants and wait for required indexes to be READY before enabling new queries. Do not use the incoming guide's blanket Functions/rules deployment sequence or relax rules to make a demo work. Tracking mirrors/rules migration and production field testing remain separate gates.
+
 ## Local demonstration
 
 Start demo emulators from Functions with `npx firebase emulators:start --config ../firebase.json --project demo-temple-procession --only auth,firestore,database`. Build Functions first. In another PowerShell terminal:
@@ -103,4 +130,12 @@ Supported event size: 20 routes, 100 groups, 400 stops; up to 200 stops/segments
 
 The final optimization pass adds versioned route caching, event-local/sparse collision processing, immediate resumable notification fan-out, fair indexed retention/maintenance, bounded live dashboard cursor pages and cached/incremental map rendering. Deployment indexes, migration cautions, configured capacity and monitoring are documented in the [optimization runbook](docs/OPERATIONS.md#optimization-rollout-and-capacity). Local regressions do not substitute for production load, native performance or battery testing.
 
+Treat stale positions as old observations, not current locations. GPS-derived crowding alerts are advisory, not authoritative occupancy counts or emergency guarantees. FCM is best-effort and must not be the sole channel for urgent instructions. Real demo footage and any additional screenshots must use disposable test events and omit private identifiers, access codes and precise private locations; no placeholder video or unverified image links are provided.
+
 Continuous screen-off Android tracking needs a separately designed foreground/background service and physical-device testing. It is not promised by navigation-safe foreground tracking. iOS release work and the Phase 42+ website remain separate stages. No production deployment, signed release, Git tag or phone demo footage was created by this upgrade.
+
+The existing iOS project is not an accepted iOS release. It needs macOS/Xcode/CocoaPods, Apple signing, Firebase/iOS registration, Maps configuration, platform permissions and APNs/FCM integration, followed by simulator and physical-device checks. Android verification does not establish iOS behavior.
+
+## License
+
+Licensed under the [MIT License](LICENSE); copyright and exact terms remain in the existing license file.

@@ -101,7 +101,7 @@ export type Notice = {
 export function queueNotification(tx: Transaction, id: string, notice: Notice): void {
   const createdAt = Timestamp.now();
   tx.create(db().doc(`notifications/${id}`), { ...notice, groupId: notice.groupId ?? '', leaderOnly: notice.leaderOnly === true,
-    state: 'active', readAt: null, createdAt, lifecycleDueAt: notice.expiresAt, retentionAt: Timestamp.fromMillis(createdAt.toMillis() + 30 * day),
+    state: 'active', isRead: false, readAt: null, createdAt, lifecycleDueAt: notice.expiresAt, retentionAt: Timestamp.fromMillis(createdAt.toMillis() + 30 * day),
     targetUserIds: [notice.uid], targetGroupIds: notice.groupId ? [notice.groupId] : [], readByUserIds: [], severity: notice.type === 'collision' ? 'high' : 'low' });
   tx.create(db().doc(`notificationDeliveries/${id}`), { uid: notice.uid, notificationId: id, state: 'pending', attempts: 0,
     deliveredTokenIds: [], nextAttemptAt: createdAt, createdAt, retentionAt: Timestamp.fromMillis(createdAt.toMillis() + 30 * day) });
@@ -176,7 +176,7 @@ export const markNotificationRead = onCall(callableOptions, async request => {
     await activeAccount(tx, uid);
     const ref = db().doc(`notifications/${id}`), snap = await tx.get(ref);
     if (!snap.exists || snap.data()?.uid !== uid) throw new HttpsError('permission-denied', 'Notification does not belong to this account.');
-    if (!snap.data()?.readAt) tx.update(ref, { readAt: Timestamp.now(), readByUserIds: [uid] });
+    if (!snap.data()?.readAt || snap.data()?.isRead !== true) tx.update(ref, { isRead: true, readAt: snap.data()?.readAt ?? Timestamp.now(), readByUserIds: [uid] });
   });
   return { ok: true };
 });

@@ -8,6 +8,7 @@ import '../map/event_map_screen.dart';
 import 'notification_record.dart';
 
 class NotificationScreen extends StatefulWidget {
+class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();

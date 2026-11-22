@@ -27,6 +27,7 @@ export default function App() {
       <Route path="/access-codes" element={<AccessCodesPage />} />
       <Route path="/announcements" element={<AnnouncementsPage />} />
       <Route path="/live-map" element={<LiveMapPage />} />
+      <Route path="/live-map" element={<LiveMapPage />} />
       <Route path="/alerts" element={<AlertsPage />} />
       <Route path="/users" element={<UsersPage />} />
       <Route path="/route-suggestions" element={<RouteSuggestionsPage />} />

@@ -27,10 +27,10 @@ function Accounts() {
     finally { setBusyId(''); }
   }
   const visible = users.items.filter(u => `${u.displayName} ${u.email} ${u.role}`.toLowerCase().includes(filter.toLowerCase()));
-  return <div><h1>Users</h1><p className="subtle">Administrator-only account management. Roles, account status and membership cleanup are validated on the server.</p>
+  return <div><h1>User management</h1><p className="subtle">Administrator-only account management. Roles, account status and membership cleanup are validated on the server.</p>
     <div className="actions"><button onClick={() => setEditing(null)}>Create account</button></div>
     {editing !== undefined && <AccountForm key={editing?.id ?? 'new'} account={editing} selfId={user?.uid ?? ''} onCancel={() => setEditing(undefined)} onSaved={() => { setEditing(undefined); setNotice('Account saved.'); }} />}
-    <section className="panel"><label>Filter loaded accounts<input type="search" value={filter} onChange={e => setFilter(e.target.value)} /></label><QueryFeedback state={users} />
+    <section className="panel"><h2>Accounts ({visible.length} of {users.items.length} loaded)</h2><label>Search loaded accounts<input type="search" value={filter} onChange={e => setFilter(e.target.value)} /></label><QueryFeedback state={users} />
       {!users.loading && !visible.length && <p>No matching accounts.</p>}
       <div className="list">{visible.map(account => <article className="item" key={account.id}><div><strong>{account.displayName || account.email}</strong><p>{account.email}</p><p>{account.role} · {account.isActive ? 'Active' : 'Inactive'}{account.id === user?.uid ? ' · You' : ''}</p></div>
         <div className="actions"><button onClick={() => setEditing(account)}>Edit</button><button className="danger" disabled={!!busyId || account.id === user?.uid} onClick={() => void remove(account)}>{busyId === account.id ? 'Removing…' : 'Remove'}</button></div>

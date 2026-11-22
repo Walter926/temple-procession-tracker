@@ -7,6 +7,9 @@ import { maximumSampleAgeMs } from './route_progress';
 
 const db = getFirestore;
 const options = { maxInstances: 10, enforceAppCheck: process.env.ENFORCE_APP_CHECK === 'true' };
+export const routeSuggestionKinds = ['wait_at_current_stop', 'delay_departure', 'proceed_to_next_checkpoint', 'use_alternate_route', 'skip_optional_stop'] as const;
+export type RouteSuggestionKind = typeof routeSuggestionKinds[number];
+type SelectedInstruction = { kind?: RouteSuggestionKind; instruction?: string };
 export const suggestionIdentity = (incidentId: string, groupId: string): string => digest('suggestion', incidentId, groupId);
 export function decisionResult(current: unknown, requested: 'approved' | 'rejected'): 'new' | 'repeat' | 'conflict' {
   return current === requested ? 'repeat' : current === 'pending' ? 'new' : 'conflict';
@@ -17,7 +20,7 @@ export function relevantSuggestion(suggestion: DocumentData, alert: DocumentData
 }
 
 /** Operator decisions and the single leader instruction are committed together. */
-export async function decideSuggestion(uid: string | undefined, suggestionId: string, decision: 'approved' | 'rejected'): Promise<{ ok: true; status: string; instructionId?: string }> {
+export async function decideSuggestion(uid: string | undefined, suggestionId: string, decision: 'approved' | 'rejected', selected: SelectedInstruction = {}): Promise<{ ok: true; status: string; instructionId?: string }> {
   return db().runTransaction(async tx => {
     const ref = db().doc(`routeSuggestions/${suggestionId}`), snap = await tx.get(ref), suggestion = snap.data();
     if (!suggestion) throw new HttpsError('not-found', 'Suggestion not found.');
@@ -46,15 +49,17 @@ export async function decideSuggestion(uid: string | undefined, suggestionId: st
     const leader = leaderSnap.data();
     if (leader?.isActive !== true || leader.role !== 'teamLeader' || leader.assignedGroupId !== suggestion.groupId) throw new HttpsError('failed-precondition', 'Assigned leader is unavailable.');
     if (existing.exists || notice.exists) throw new HttpsError('failed-precondition', 'Suggestion delivery already exists; reconcile this record.');
+    const message = selected.instruction ?? suggestion.message ?? suggestion.reason ?? suggestion.rationale;
+    const kind = selected.kind ?? (routeSuggestionKinds.includes(suggestion.kind) ? suggestion.kind : 'wait_at_current_stop');
     const expiresAt = Timestamp.fromMillis(Math.min(millis(suggestion.expiresAt), Date.now() + 15 * 60000));
     if (previous?.data()?.state === 'active') tx.update(previous.ref, { state: 'superseded', supersededBy: instructionId, endedAt: decidedAt });
     tx.create(db().doc(`routeInstructions/${instructionId}`), { uid: leaderUid, eventId: suggestion.eventId, groupId: suggestion.groupId, routeId: suggestion.routeId,
-      alertId: suggestion.alertId, incidentId: suggestion.incidentId, suggestionId, message: suggestion.message ?? suggestion.reason,
+      alertId: suggestion.alertId, incidentId: suggestion.incidentId, suggestionId, message, kind,
       suggestedRouteSegmentIds: suggestion.suggestedRouteSegmentIds ?? [], state: 'active', createdBy: uid, createdAt: decidedAt, expiresAt,
       acknowledgedAt: null, lifecycleDueAt: expiresAt, retentionAt: Timestamp.fromMillis(Date.now() + 30 * 86400000) });
     tx.set(db().doc(`routeInstructionHeads/${suggestion.groupId}`), { instructionId, incidentId: suggestion.incidentId, uid: leaderUid, updatedAt: decidedAt });
-    tx.update(ref, { status: 'approved', isAccepted: true, acceptedByUserId: uid, decidedBy: uid, decidedAt, instructionId });
-    queueNotification(tx, notificationId, { uid: leaderUid, eventId: suggestion.eventId, groupId: suggestion.groupId, title: 'Route instruction', body: suggestion.message ?? suggestion.reason,
+    tx.update(ref, { status: 'approved', isAccepted: true, acceptedByUserId: uid, decidedBy: uid, decidedAt, instructionId, kind, instruction: message });
+    queueNotification(tx, notificationId, { uid: leaderUid, eventId: suggestion.eventId, groupId: suggestion.groupId, title: 'Route instruction', body: message,
       type: 'route-instruction', sourceCollection: 'routeInstructions', sourceId: instructionId, leaderOnly: true, expiresAt });
     return { ok: true, status: 'approved', instructionId };
   });
@@ -63,8 +68,20 @@ export async function decideSuggestion(uid: string | undefined, suggestionId: st
 export const approveRouteSuggestion = onCall(options, async request => decideSuggestion(request.auth?.uid, documentId(request.data?.suggestionId), 'approved'));
 export const rejectRouteSuggestion = onCall(options, async request => decideSuggestion(request.auth?.uid, documentId(request.data?.suggestionId), 'rejected'));
 export const decideRouteSuggestion = onCall(options, async request => {
-  if (!['approved', 'rejected'].includes(request.data?.decision)) throw new HttpsError('invalid-argument', 'Decision must be approved or rejected.');
-  return decideSuggestion(request.auth?.uid, documentId(request.data?.suggestionId), request.data.decision);
+  const decision = request.data?.decision === 'approve' ? 'approved' : request.data?.decision === 'ignore' ? 'rejected' : request.data?.decision;
+  if (!['approved', 'rejected'].includes(decision)) throw new HttpsError('invalid-argument', 'Decision must be approved or rejected.');
+  const selected: SelectedInstruction = {};
+  if (decision === 'approved') {
+    if (request.data?.kind !== undefined) {
+      if (!routeSuggestionKinds.includes(request.data.kind)) throw new HttpsError('invalid-argument', 'Choose a supported suggestion action.');
+      selected.kind = request.data.kind;
+    }
+    if (request.data?.instruction !== undefined) {
+      if (typeof request.data.instruction !== 'string' || !request.data.instruction.trim() || request.data.instruction.trim().length > 500) throw new HttpsError('invalid-argument', 'Enter a 1–500 character instruction.');
+      selected.instruction = request.data.instruction.trim();
+    }
+  }
+  return decideSuggestion(request.auth?.uid, documentId(request.data?.suggestionId), decision, selected);
 });
 
 /** Close old incident records with fresh source reads; duplicated/unordered triggers cannot revive them. */
@@ -121,7 +138,8 @@ export async function generateIncidentSuggestions(alertId: string): Promise<void
       const now = Timestamp.now(), expiresAt = Timestamp.fromMillis(Date.now() + 15 * 60000), retentionAt = Timestamp.fromMillis(Date.now() + 30 * 86400000);
       const reason = 'Stop capacity exceeded. Hold clear of the crowded stop and contact event dispatch before proceeding.';
       if (!suggestionSnap.exists) tx.create(suggestionSnap.ref, { eventId: alert.eventId, groupId, routeId: group.routeId, alertId, incidentId: alert.incidentId,
-        reason, message: reason, recommendationType: 'hold', suggestedRouteSegmentIds: [], status: 'pending', lifecycleState: 'active', isAccepted: false,
+        reason, rationale: reason, message: reason, kind: 'wait_at_current_stop', sourceType: 'collision', sourceId: alertId, groupIds: [groupId],
+        recommendationType: 'hold', suggestedRouteSegmentIds: [], status: 'pending', lifecycleState: 'active', isAccepted: false,
         acceptedByUserId: null, createdAt: now, expiresAt, lifecycleDueAt: expiresAt, retentionAt });
       const leader = leaderSnap?.data();
       if (leader?.isActive !== true || leader.role !== 'teamLeader' || leader.assignedGroupId !== groupId || !warningSnap || !noticeSnap) return;
