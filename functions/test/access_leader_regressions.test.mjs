@@ -65,6 +65,19 @@ test('authorized issuance supports both scopes, omitted limits, six symbols and 
   }
 });
 
+test('omitted, malformed and out-of-range client expirations cannot override the server-fixed membership lifetime', async () => {
+  const f = await fixture();
+  for (const expiresAtMs of [undefined, null, 0, Date.now() - 1, Date.now() + 2 * 366 * 86400000, 'tomorrow', true, {}]) {
+    const started = Date.now();
+    const result = await issue(f, { expiresAtMs, durationHours: 8760, expiresAt: '2099-01-01' });
+    const finished = Date.now(), stored = await read(`accessCodes/${result.id}`);
+    assert.ok(result.expiresAtMs >= started + 86400000 && result.expiresAtMs <= finished + 86400000);
+    assert.equal(stored.expiresAt.toMillis(), result.expiresAtMs);
+    assert.equal(stored.grantedRole, 'teamMember');
+    assert.equal(stored.scope, 'group');
+  }
+});
+
 test('invalid maximum uses and inconsistent event/group scope never create code records', async () => {
   const f = await fixture();
   for (const maxUses of [null, 0, -1, 1001, 1.5, '1', true, [], {}]) await rejects(issue(f, { maxUses }), 'invalid-argument');
@@ -77,12 +90,23 @@ test('code issuance preserves active-owner/admin and assigned-primary-only autho
   const f = await fixture();
   await rejects(call(codes.createAccessCode, undefined, { eventId: f.event }), 'unauthenticated');
   for (const uid of [f.other, f.member, f.leader, f.backup]) await rejects(issue(f, {}, uid), 'permission-denied');
+  await db.doc(`users/${f.leader}`).update({ assignedGroupId: f.group });
+  await rejects(issue(f, {}, f.leader), 'permission-denied');
   await db.doc(`groups/${f.group}`).update({ leaderUserId: f.leader, backupLeaderUserId: f.backup });
+  await db.doc(`users/${f.leader}`).update({ assignedGroupId: f.foreignGroup });
+  await rejects(issue(f, {}, f.leader), 'permission-denied');
   await db.doc(`users/${f.leader}`).update({ assignedGroupId: f.group });
   await db.doc(`users/${f.backup}`).update({ assignedGroupId: f.group });
-  await issue(f, {}, f.leader);
+  const issued = await issue(f, {}, f.leader);
+  assert.equal((await read(`accessCodes/${issued.id}`)).grantedRole, 'teamMember');
   await rejects(issue(f, {}, f.backup), 'permission-denied');
   await rejects(issue(f, { groupId: '' }, f.leader), 'permission-denied');
+  await rejects(issue(f, { eventId: f.foreignEvent, groupId: f.foreignGroup }, f.leader), 'permission-denied');
+  for (const patch of [{ isActive: false }, { isActive: true, deleting: true }]) {
+    await db.doc(`users/${f.leader}`).update(patch);
+    await rejects(issue(f, {}, f.leader), 'permission-denied');
+  }
+  await db.doc(`users/${f.leader}`).update({ isActive: true, deleting: false });
   await issue(f, { eventId: f.foreignEvent, groupId: f.foreignGroup }, f.admin);
   await db.doc(`users/${f.owner}`).update({ isActive: false });
   await rejects(issue(f), 'permission-denied');
