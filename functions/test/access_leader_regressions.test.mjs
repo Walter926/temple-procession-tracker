@@ -46,13 +46,14 @@ async function fixture() {
   return f;
 }
 
-test('authorized issuance supports both scopes, omitted limits, six symbols and a server-fixed 24-hour expiry', async () => {
+test('authorized issuance supports both scopes, omitted limits, six digits and a server-fixed 24-hour expiry', async () => {
   const f = await fixture();
   for (const [groupId, scope, maxUses] of [[f.group, 'group', undefined], ['', 'event', 1], ['', 'event', 1000]]) {
     const started = Date.now();
     const result = await issue(f, { groupId, scope, maxUses, expiresAtMs: started + 1, durationHours: 1, grantedRole: 'teamMember', enabled: true });
     const finished = Date.now(), stored = await read(`accessCodes/${result.id}`);
-    assert.ok(/^[A-Z0-9]{6}$/.test(result.code), 'six alphanumeric symbols');
+    assert.equal(typeof result.code, 'string');
+    assert.match(result.code, /^[0-9]{6}$/, 'six ASCII numeric digits');
     assert.ok(result.id === codes.codeHash(result.code), 'only the hash identifies stored codes');
     assert.equal(stored.code, undefined);
     assert.equal(stored.scope, scope);
@@ -181,6 +182,28 @@ test('new issuance leaves existing unlimited codes unchanged and redeemable beyo
   assert.equal(stored.expiresAt.toMillis(), original.expiresAt.toMillis());
 });
 
+test('a recorded six-alphanumeric code remains redeemable until its original expiry without migration', async () => {
+  const f = await fixture();
+  let legacy, id;
+  do {
+    legacy = `${randomUUID().replace(/-/g, '').slice(0, 5)}Z`.toUpperCase();
+    id = codes.codeHash(legacy);
+  } while ((await db.doc(`accessCodes/${id}`).get()).exists);
+  const expiresAt = Timestamp.fromMillis(Date.now() + 2 * 86400000), ref = db.doc(`accessCodes/${id}`);
+  await ref.create({ eventId: f.event, groupId: '', scope: 'event', grantedRole: 'teamMember', enabled: true,
+    maxUses: 7, usedCount: 0, expiresAt, createdBy: f.owner, createdAt: Timestamp.now() });
+  assert.equal((await redeem(f.member, ` ${legacy.toLowerCase()} `)).eventId, f.event);
+  assert.equal((await redeem(f.member, legacy)).alreadyJoined, true);
+  const stored = await read(ref.path);
+  assert.equal(stored.usedCount, 1);
+  assert.equal(stored.maxUses, 7);
+  assert.equal(stored.expiresAt.toMillis(), expiresAt.toMillis());
+  assert.equal((await byEvent('accessCodes', f.event)).size, 1);
+  await ref.update({ expiresAt: Timestamp.fromMillis(Date.now() - 1) });
+  await rejects(redeem(f.member, legacy), 'deadline-exceeded');
+  assert.equal((await read(ref.path)).usedCount, 1);
+});
+
 test('a synthetic historical-repository 20-hex code remains redeemable without rewriting its hash, limit or expiry', async () => {
   const f = await fixture(), legacy = randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase();
   const id = codes.codeHash(legacy), expiresAt = Timestamp.fromMillis(Date.now() + 2 * 86400000);
@@ -194,6 +217,9 @@ test('a synthetic historical-repository 20-hex code remains redeemable without r
   assert.equal(stored.maxUses, 7);
   assert.equal(stored.expiresAt.toMillis(), expiresAt.toMillis());
   assert.equal((await byEvent('accessCodes', f.event)).size, 1);
+  await db.doc(`accessCodes/${id}`).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1) });
+  await rejects(redeem(f.member, legacy), 'deadline-exceeded');
+  assert.equal((await read(`accessCodes/${id}`)).usedCount, 1);
 });
 
 test('the leader directory enforces ownership, group scope and active callers before exposing profiles', async () => {

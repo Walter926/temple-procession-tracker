@@ -22,7 +22,7 @@ class CodeFunctions implements FirebaseFunctions {
   Object? error;
   Map<String, dynamic> response = {
     'id': 'hash',
-    'code': 'AB12C3',
+    'code': '513684',
     'expiresAtMs': 1795000000000,
   };
   @override
@@ -118,19 +118,27 @@ void main() {
     },
   );
   test(
-    'legacy creation retains the returned code without a returned expiry',
+    'outdated issuance is rejected with deployment guidance, never shortened',
     () async {
-      functions.response = {'id': 'hash', 'code': 'ABCD-EF12-1234-5678-9012'};
-      final issued = await service.generate(eventId: 'event');
-      expect(issued.id, 'hash');
-      expect(issued.code, 'ABCD-EF12-1234-5678-9012');
-      expect(issued.expiresAt, isNull);
+      for (final code in ['ABCD-EF12-1234-5678-9012', 'AB12C3']) {
+        functions.response = {'id': 'hash', 'code': code};
+        await expectLater(
+          service.generate(eventId: 'event'),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'deployment guidance',
+              contains('deploy the updated access-code functions'),
+            ),
+          ),
+        );
+      }
     },
   );
   test('malformed creation responses are rejected', () async {
     final valid = Map<String, dynamic>.of(functions.response);
     for (final response in <Map<String, dynamic>>[
-      {'code': 'AB12C3'},
+      {'code': '513684'},
       {...valid, 'id': 17},
       {...valid, 'id': ' '},
       {...valid, 'code': null},
@@ -151,6 +159,28 @@ void main() {
     final issued = await service.generate(eventId: 'event');
     expect(issued.expiresAt!.millisecondsSinceEpoch, 1795000000000);
   });
+  test(
+    'new numeric codes retain all six digits, including leading zeroes',
+    () async {
+      functions.response['code'] = '001234';
+      final issued = await service.generate(eventId: 'event');
+      expect(issued.code, '001234');
+      await service.redeem(' 001234 ');
+      expect(functions.calls.last.$2, {'code': '001234'});
+      for (final valid in ['000000', '513684', '999999']) {
+        expect(AccessCodeService.isNewCodeFormat(valid), isTrue);
+      }
+      for (final invalid in [
+        'AB12C3',
+        '12345',
+        '1234567',
+        '123-456',
+        ' 513684 ',
+      ]) {
+        expect(AccessCodeService.isNewCodeFormat(invalid), isFalse);
+      }
+    },
+  );
   test('invalid maximum uses never reach the callable', () async {
     for (final uses in [-1, 0, 1001]) {
       await expectLater(
@@ -212,12 +242,34 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: JoinCodeScreen()));
+    await tester.tap(find.text('Use an older code'));
+    await tester.pump();
     await tester.enterText(find.byType(TextField), 'ABCD-EF12-1234-5678-9012');
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
       'ABCD-EF12-1234-5678-9012',
     );
   });
+  testWidgets(
+    'join input defaults to six numeric digits and retains leading zeroes',
+    (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: JoinCodeScreen()));
+      final input = tester.widget<TextField>(find.byType(TextField));
+      expect(input.keyboardType, TextInputType.number);
+      expect(input.maxLength, 6);
+      expect(input.decoration!.hintText, '513684');
+      await tester.enterText(find.byType(TextField), '001234');
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '001234',
+      );
+      await tester.enterText(find.byType(TextField), 'AB12-CD34');
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '1234',
+      );
+    },
+  );
   test(
     'history distinguishes exhaustion, expiry, revocation and legacy unlimited codes',
     () {

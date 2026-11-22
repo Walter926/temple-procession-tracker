@@ -25,10 +25,11 @@ export default function AccessCodesPage() {
   const [fallbackScope, setFallbackScope] = useState('');
   const indexFree = fallbackScope === scopeKey;
   const codes = useRecords<AccessCodeRecord>('accessCodes', leader ? 'groupId' : 'eventId', leader ? groupId : eventId, { indexFree });
-  useEffect(() => {
-    if (!indexFree && /requires an index|index.*(?:building|not ready)/i.test(codes.error)) setFallbackScope(scopeKey);
-  }, [codes.error, indexFree, scopeKey]);
-  const [latest, setLatest] = useState<NewCode>();
+  // Adjust this query's mode when its external error changes, before rendering
+  // an error screen; the new scoped plan disposes the failed subscription.
+  if (!indexFree && /requires an index|index.*(?:building|not ready)/i.test(codes.error)) setFallbackScope(scopeKey);
+  const [issued, setLatest] = useState<NewCode & { scopeKey: string }>();
+  const latest = issued?.scopeKey === scopeKey ? issued : undefined;
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -45,12 +46,14 @@ export default function AccessCodesPage() {
     try {
       if (!available || (groupId && !groups.items.some(g => g.id === groupId))) throw Error('Select an available event and a valid group.');
       const result = await callManagement<Record<string, unknown>, NewCode>('createAccessCode', accessCodeRequest(eventId, groupId));
-      const format = issuedCodeFormat(result.code);
-      if (!format || !result.id) throw Error('The server returned an invalid code response. Ask an administrator to check the access-code backend before retrying.');
-      setLatest({ ...result, expiresAtMs: result.expiresAtMs });
-      setNotice(format === 'legacy'
-        ? 'A legacy-format code was generated and can be copied below. The deployed backend is outdated: update the access-code functions for six-character codes and assigned-leader permissions.'
-        : 'Access code generated. Copy it below; issued-code history updates automatically.');
+      const format = issuedCodeFormat(result?.code);
+      if (!format) throw Error('Backend deployment needed: ask an administrator to deploy the updated access-code functions, then generate a new code with exactly six digits.');
+      if (typeof result.id !== 'string' || !result.id.trim() || (result.expiresAtMs != null &&
+        (!Number.isSafeInteger(result.expiresAtMs) || result.expiresAtMs <= 0 || result.expiresAtMs > 8640000000000000))) {
+        throw Error('The server returned an invalid code response. Ask an administrator to check the access-code backend before retrying.');
+      }
+      setLatest({ ...result, scopeKey });
+      setNotice('Access code generated. Copy it below; issued-code history updates automatically.');
     } catch (reason) { setError(errorMessage(reason)); }
     finally { flight.finish(); setBusy(false); }
   }
@@ -65,7 +68,7 @@ export default function AccessCodesPage() {
     try { await navigator.clipboard.writeText(latest?.code ?? ''); setNotice('Code copied.'); }
     catch { setError('Unable to copy. Select the code and copy it manually.'); }
   }
-  return <div><h1>Access codes</h1><p className="subtle">Six alphanumeric characters · Valid for 24 hours · Up to {DEFAULT_MAX_USES} eligible members per new code. Codes grant membership only, never leader publishing rights.</p>
+  return <div><h1>Access codes</h1><p className="subtle">Six digits · Valid for 24 hours · Up to {DEFAULT_MAX_USES} eligible members per new code. Codes grant membership only, never leader publishing rights.</p>
     <form className="panel" noValidate onSubmit={submit}><div className="form-grid"><label>Event<select name="codeEvent" required disabled={busy || leader} value={eventId} onChange={e => { setEventId(e.target.value); setGroupId(''); setLatest(undefined); setNotice(''); setError(''); }}>
       <option value="">Choose event</option>{events.items.filter(e => !['completed', 'cancelled', 'archived'].includes(e.status)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
       <label>Scope<select name="codeScope" disabled={busy || leader} value={groupId} onChange={e => { setGroupId(e.target.value); setLatest(undefined); setNotice(''); setError(''); }}>{!leader && <option value="">Event membership (no group)</option>}{groups.items.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>

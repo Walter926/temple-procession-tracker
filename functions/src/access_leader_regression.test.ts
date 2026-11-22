@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { randomUUID } from 'node:crypto';
+import { mock, test } from 'node:test';
+import crypto, { randomUUID } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
 import { accessCodeMaxUses, CODE_LIFETIME_MS, DEFAULT_MAX_USES, generateCode, normalizeCode, validateCode } from './access_codes';
 import { leaderDirectoryRecord } from './account_management';
@@ -31,11 +31,25 @@ test('corrupt stored usage limits fail closed instead of coercing into unlimited
   }
 });
 
-test('code generation retains six symbols, normalization and the fixed 24-hour contract', () => {
+test('new codes contain six digits while redemption retains legacy normalization and the fixed 24-hour contract', () => {
   assert.equal(CODE_LIFETIME_MS, 86400000);
-  for (let index = 0; index < 30; index++) assert.ok(/^[A-Z0-9]{6}$/.test(generateCode()));
+  for (let index = 0; index < 30; index++) assert.match(generateCode(), /^[0-9]{6}$/);
+  assert.equal(normalizeCode(' 000123 '), '000123');
   assert.equal(normalizeCode(' ab12cd '), 'AB12CD');
   for (const value of ['', 'AB-CD1', 'ABCDEFG', 123456]) assert.throws(() => normalizeCode(value), { code: 'invalid-argument' });
+});
+
+test('code generation preserves leading zeros across the complete numeric range', () => {
+  const random = mock.method(crypto, 'randomInt');
+  try {
+    for (const [value, expected] of [[0, '000000'], [7, '000007'], [12345, '012345'], [513684, '513684'], [999999, '999999']] as const) {
+      random.mock.mockImplementation(() => value);
+      assert.equal(generateCode(), expected);
+      assert.deepEqual(random.mock.calls[random.mock.calls.length - 1].arguments, [1_000_000]);
+    }
+  } finally {
+    random.mock.restore();
+  }
 });
 
 test('leader labels prefer display name, full name, email, then a non-UID fallback', () => {

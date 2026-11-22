@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { before, after, test } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, documentId, limit, Timestamp } from 'firebase/firestore';
 
 let environment;
 const projectId = 'demo-temple-procession';
@@ -94,6 +94,15 @@ test('active member can read joined private event and own membership only', asyn
 test('leader registration alone does not grant private event access', async () => {
   await assertSucceeds(getDoc(doc(client('leader'), 'events/event-a')));
   await assertFails(getDoc(doc(client('unassigned'), 'events/event-a')));
+});
+
+test('code history admits admins, owning organizers and assigned primary leaders only, including index-free group pages', async () => {
+  for (const uid of ['admin', 'owner']) await assertSucceeds(getDocs(query(collection(client(uid), 'accessCodes'), where('eventId', '==', 'event-a'), orderBy(documentId()), limit(200))));
+  await assertSucceeds(getDoc(doc(client('leader'), 'groups/group-a')));
+  await assertSucceeds(getDocs(query(collection(client('leader'), 'accessCodes'), where('groupId', '==', 'group-a'), orderBy(documentId()), limit(200))));
+  await assertFails(getDocs(query(collection(client('leader'), 'accessCodes'), where('eventId', '==', 'event-a'))));
+  for (const uid of ['other', 'unassigned', 'member', 'inactive']) await assertFails(getDocs(query(collection(client(uid), 'accessCodes'), where('groupId', '==', 'group-a'), orderBy(documentId()), limit(200))));
+  await assertFails(setDoc(doc(client('leader'), 'accessCodes/forged-leader'), { eventId: 'event-a', groupId: 'group-a', grantedRole: 'teamMember' }));
 });
 
 test('inactive account cannot access private events even with organizer role', async () => {

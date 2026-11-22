@@ -25,9 +25,10 @@ test('document IDs reject path and RTDB metacharacters and control characters wi
   for(const id of ['', '../users/a', 'a#b','a.b','a[b','a\n']) assert.throws(()=>documentId(id));
   assert.equal(documentId('event-A_1'),'event-A_1');
 });
-test('codes are six unbiased alphanumeric symbols with a fixed 24h lifetime and strict input shape', () => {
-  for(let i=0;i<100;i++) assert.match(generateCode(),/^[A-Z0-9]{6}$/);
+test('new codes are six unbiased digits with a fixed 24h lifetime; redemption retains legacy input', () => {
+  for(let i=0;i<100;i++) assert.match(generateCode(),/^[0-9]{6}$/);
   assert.equal(CODE_LIFETIME_MS,86_400_000);
+  assert.equal(normalizeCode(' 000123 '),'000123');
   assert.equal(normalizeCode(' ab12cd '),'AB12CD');
   for(const code of ['AB-CD1','ABCDEF0','ABC/12',123456]) assert.throws(()=>normalizeCode(code));
 });

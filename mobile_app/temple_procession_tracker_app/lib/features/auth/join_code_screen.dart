@@ -17,6 +17,7 @@ class JoinCodeScreen extends StatefulWidget {
 class _JoinCodeScreenState extends State<JoinCodeScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _busy = false;
+  bool _legacyCode = false;
   String? _error;
 
   @override
@@ -35,7 +36,7 @@ class _JoinCodeScreenState extends State<JoinCodeScreen> {
     if (!AccessCodeService.isValidFormat(code)) {
       setState(
         () => _error =
-            'Enter six letters or numbers, or a legacy 20-character hexadecimal code.',
+            'Enter six digits. To redeem an earlier invitation, choose “Use an older code”.',
       );
       return;
     }
@@ -95,26 +96,47 @@ class _JoinCodeScreenState extends State<JoinCodeScreen> {
           padding: const EdgeInsets.all(24),
           children: [
             const Text(
-              'Enter the six-character code from your organizer or assigned leader. Legacy 20-character hexadecimal codes are also accepted until their server-recorded expiry. New codes expire after 24 hours. An event code joins only the event, not a group.',
+              'Enter the six-digit code from your organizer or assigned leader. New codes expire after 24 hours. An event code joins only the event, not a group.',
             ),
             const SizedBox(height: 20),
             TextField(
               controller: _controller,
               enabled: !_busy,
-              textCapitalization: TextCapitalization.characters,
-              maxLength: 24,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9-]')),
-              ],
+              keyboardType: _legacyCode
+                  ? TextInputType.text
+                  : TextInputType.number,
+              textCapitalization: _legacyCode
+                  ? TextCapitalization.characters
+                  : TextCapitalization.none,
+              maxLength: _legacyCode ? 24 : 6,
+              inputFormatters: _legacyCode
+                  ? [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9-]'))]
+                  : [FilteringTextInputFormatter.digitsOnly],
               onSubmitted: (_) {
                 if (!_busy) _join();
               },
               decoration: const InputDecoration(
                 labelText: 'Access Code',
-                hintText: 'A7K2P9',
+                hintText: '513684',
                 border: OutlineInputBorder(),
               ),
             ),
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                      _legacyCode = !_legacyCode;
+                      _controller.clear();
+                      _error = null;
+                    }),
+              child: Text(
+                _legacyCode ? 'Use a 6-digit code' : 'Use an older code',
+              ),
+            ),
+            if (_legacyCode)
+              const Text(
+                'Earlier six-character or 20-character hexadecimal invitations remain valid until their original expiry.',
+              ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _busy ? null : _join,

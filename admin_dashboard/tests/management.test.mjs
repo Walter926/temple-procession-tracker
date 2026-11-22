@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createResourceWriter, createSingleFlight } from '../src/lib/management_requests.ts';
 import { managementError } from '../src/lib/management_errors.ts';
-import { accessCodeRequest, accessCodeStatus } from '../src/lib/access_code_contract.ts';
+import { accessCodeRequest, accessCodeStatus, CODE_LIFETIME_MS, issuedCodeFormat } from '../src/lib/access_code_contract.ts';
 import { eligibleLeader, leaderLabel, mergeProfiles } from '../src/lib/leader_profiles.ts';
 import { dateTimeLocal, overdueEventNotice, parseLocalDateTime } from '../src/lib/event_dates.ts';
 import { eventFieldErrors, routeFieldErrors, stopFieldErrors } from '../src/lib/validation.ts';
@@ -74,10 +74,18 @@ test('single-flight guard unlocks only after explicit completion', () => {
 });
 
 test('code request uses numeric default 1000 and preserves membership scopes', () => {
-  assert.deepEqual(accessCodeRequest('event'), { eventId: 'event', groupId: '', scope: 'event', grantedRole: 'teamMember', enabled: true, maxUses: 1000 });
+  const started = Date.now(), request = accessCodeRequest('event');
+  assert.deepEqual({ ...request, expiresAtMs: undefined }, { eventId: 'event', groupId: '', scope: 'event', grantedRole: 'teamMember', enabled: true, maxUses: 1000, expiresAtMs: undefined });
+  assert.equal(CODE_LIFETIME_MS, 86400000);
+  assert.ok(request.expiresAtMs >= started + CODE_LIFETIME_MS && request.expiresAtMs <= Date.now() + CODE_LIFETIME_MS);
   assert.equal(accessCodeRequest('event', 'group').scope, 'group');
   for (const bad of [0, -1, 1001, 1.5, NaN, '1000', null]) assert.throws(() => accessCodeRequest('event', '', bad), /Maximum uses/);
   assert.throws(() => accessCodeRequest(''), /Choose an event/);
+});
+
+test('new code responses require exactly six numeric digits and preserve leading zeros', () => {
+  for (const code of ['513684', '000042', '000000']) assert.equal(issuedCodeFormat(code), 'current');
+  for (const invalid of [undefined, null, 123456, '12345', '1234567', ' 123456', '123456 ', '123456\n', '１２３４５６', 'AB12CD', 'ABCD-1234-EFAB-5678-90CD', 'ABCD1234EFAB567890CD', '<script>']) assert.equal(issuedCodeFormat(invalid), undefined);
 });
 
 test('issued-code states distinguish exhausted, expired and revoked; legacy unlimited codes remain valid', () => {

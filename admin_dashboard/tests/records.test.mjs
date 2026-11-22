@@ -8,6 +8,32 @@ const admin = { uid: 'admin-a', role: 'admin', isActive: true };
 const deferred = () => { let resolve, reject; const promise = new Promise((ok, fail) => { resolve = ok; reject = fail; }); return { promise, resolve, reject }; };
 const record = (id, createdAt = 0, extra = {}) => ({ id, createdAt, ...extra });
 
+test('leader code queries are enabled only for their assigned group and never unlock management collections', () => {
+  const leader = { uid: 'leader', role: 'teamLeader', isActive: true, assignedGroupId: 'group-a' };
+  const plan = recordsPlan('accessCodes', leader, 'groupId', 'group-a');
+  assert.equal(plan.enabled, true);
+  assert.deepEqual(plan.filters, [{ field: 'groupId', value: 'group-a' }]);
+  for (const [field, id] of [['eventId', 'event-a'], ['groupId', 'group-b'], ['groupId', ''], [undefined, undefined]]) assert.equal(recordsPlan('accessCodes', leader, field, id).enabled, false);
+  for (const collection of ['events', 'groups', 'routes', 'users', 'announcements']) assert.equal(recordsPlan(collection, leader, 'groupId', 'group-a').enabled, false);
+  for (const patch of [{ isActive: false }, { assignedGroupId: '' }, { uid: undefined }]) assert.equal(recordsPlan('accessCodes', { ...leader, ...patch }, 'groupId', 'group-a').enabled, false);
+});
+
+test('access-code index fallback retains scope and bounded stable ID cursors without changing normal newest-first feeds', () => {
+  for (const [session, field, id] of [[owner, 'eventId', 'event-a'], [{ uid: 'leader', role: 'teamLeader', isActive: true, assignedGroupId: 'group-a' }, 'groupId', 'group-a']]) {
+    const normal = recordsPlan('accessCodes', session, field, id);
+    const fallback = recordsPlan('accessCodes', session, field, id, { indexFree: true });
+    assert.equal(fallback.enabled, true);
+    assert.deepEqual(fallback.filters, normal.filters);
+    assert.deepEqual(fallback.order, [{ field: '__name__', direction: 'asc' }]);
+    assert.equal(fallback.pageSize, 200);
+    assert.notEqual(fallback.key, normal.key);
+    const s = server({ ...fallback, pageSize: 2 }, [record('a', 3, { [field]: id }), record('b', 2, { [field]: id }), record('c', 1, { [field]: id }), record('foreign', 4, { [field]: 'foreign' })]);
+    s.emit();
+    assert.deepEqual(s.pager.getSnapshot().items.map(item => item.id), ['a', 'b']);
+    s.pager.dispose();
+  }
+});
+
 // In-memory server: honors the production plan's filters/order, reports the
 // documents actually read, and uses full sort-value/ID cursors, not offsets.
 function server(plan, data) {

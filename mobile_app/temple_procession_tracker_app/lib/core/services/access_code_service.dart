@@ -35,6 +35,10 @@ class AccessCodeService {
   static bool isValidFormat(String code) =>
       RegExp(r'^(?:[A-Z0-9]{6}|[A-F0-9]{20})$').hasMatch(normalize(code));
 
+  /// New issuance is numeric only; earlier formats are redemption-only.
+  static bool isNewCodeFormat(String code) =>
+      RegExp(r'^[0-9]{6}$').hasMatch(code);
+
   Future<IssuedAccessCode> generate({
     required String eventId,
     String groupId = '',
@@ -60,10 +64,17 @@ class AccessCodeService {
     final id = result.data['id'];
     final code = result.data['code'];
     final expiresAtMs = result.data['expiresAtMs'];
+    if (code is String && isValidFormat(code) && !isNewCodeFormat(code)) {
+      throw StateError(
+        'The server is still issuing an older code format. Ask an administrator '
+        'to deploy the updated access-code functions for six-digit numeric codes. '
+        'Do not shorten an existing code.',
+      );
+    }
     if (id is! String ||
         id.trim().isEmpty ||
         code is! String ||
-        !isValidFormat(code) ||
+        !isNewCodeFormat(code) ||
         (expiresAtMs != null &&
             (expiresAtMs is! num ||
                 !expiresAtMs.isFinite ||
@@ -84,7 +95,7 @@ class AccessCodeService {
   Future<Map<String, dynamic>> redeem(String code) async {
     if (!isValidFormat(code)) {
       throw ArgumentError(
-        'Enter six letters or numbers, or a legacy 20-character hexadecimal code.',
+        'Enter a six-digit code, or use an older invitation code until it expires.',
       );
     }
     final result = await _functions

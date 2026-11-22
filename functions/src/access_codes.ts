@@ -5,7 +5,6 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { assertAvailableEvent, assertEventManager, assertPrimaryLeader, callableOptions, consumeAttempt, documentId, requireActiveUser } from './authorization';
 import { membershipId, writeMembership } from './memberships';
 
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 export const CODE_LIFETIME_MS = 86_400_000;
 export const DEFAULT_MAX_USES = 1000;
 /** Both clients may omit the limit; only newly issued codes use this default. */
@@ -13,16 +12,16 @@ export function accessCodeMaxUses(value: unknown = DEFAULT_MAX_USES): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 1000) throw new HttpsError('invalid-argument', 'Maximum uses must be an integer from 1 to 1000.');
   return value;
 }
-export function generateCode(): string { return Array.from({ length: 6 }, () => ALPHABET[randomInt(36)]).join(''); }
+export function generateCode(): string { return randomInt(1_000_000).toString().padStart(6, '0'); }
 export function codeHash(code: string): string { return createHash('sha256').update(code).digest('hex'); }
 export function normalizeCode(value: unknown): string {
-  if (typeof value !== 'string' || !/^[A-Z0-9]{6}$/.test(value.trim().toUpperCase())) throw new HttpsError('invalid-argument', 'Enter a six-character alphanumeric code.');
+  if (typeof value !== 'string' || !/^[A-Z0-9]{6}$/.test(value.trim().toUpperCase())) throw new HttpsError('invalid-argument', 'Enter a six-digit code or an unexpired legacy code.');
   return value.trim().toUpperCase();
 }
 function redemptionCode(value: unknown): string {
   // Historical repository code used 20 hexadecimal symbols in hyphenated groups;
   // this compatibility path does not imply those codes exist in production.
-  // Accept those only on redemption; new issuance and six-symbol validation stay unchanged.
+  // Accept legacy codes only on redemption, without shortening or reissuing them.
   const legacy = typeof value === 'string' ? value.replace(/[-\s]/g, '').toUpperCase() : '';
   return /^[A-F0-9]{20}$/.test(legacy) ? legacy : normalizeCode(value);
 }

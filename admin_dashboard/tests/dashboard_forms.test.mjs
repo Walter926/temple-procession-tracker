@@ -40,6 +40,7 @@ function harness(file, stubs = {}, globals = {}) {
   }
   const loaded = load(fileURLToPath(new URL(`../src/${file}`, import.meta.url)));
   return {
+    exports: loaded,
     render(props, target = loaded.default) { cursor = 0; effects.length = 0; return target(props); },
     effects() { for (const effect of effects.splice(0)) { const cleanup = effect(); if (cleanup) cleanups.push(cleanup); } },
     dispose() { for (const cleanup of cleanups.reverse()) cleanup(); },
@@ -93,8 +94,10 @@ test('event editor sends one aligned payload on double submission and reports in
 test('access-code generation sends default 1000 once and a history failure is never rendered as no codes', async () => {
   const requests = [];
   const h = harness('pages/AccessCodesPage.tsx', {
+    '../context/AuthContext': { useSession: () => ({ user: { uid: 'owner' }, role: 'organizer', isActive: true }) },
+    '../lib/useAssignedCodeScope': { useAssignedCodeScope: () => ({ loading: false, error: '' }) },
     '../lib/records': { useManagedEvents: () => ({ ...empty, items: [event] }), useRecords: collection => collection === 'accessCodes' ? { ...empty, error: 'The query requires an index.' } : empty },
-    '../lib/management': { callManagement: async (name, data) => { requests.push({ name, data }); return { id: 'code-id', code: 'ABC123' }; }, errorMessage: String },
+    '../lib/management': { callManagement: async (name, data) => { requests.push({ name, data }); return { id: 'code-id', code: '513684' }; }, errorMessage: String },
   });
   let tree = h.render();
   elements(tree).find(element => element.type === 'select' && element.props.name === 'codeEvent').props.onChange({ target: { value: 'event' } });
@@ -102,8 +105,131 @@ test('access-code generation sends default 1000 once and a history failure is ne
   const submit = { preventDefault() {}, stopPropagation() {} }, form = find(tree, 'form');
   await Promise.all([form.props.onSubmit(submit), form.props.onSubmit(submit)]);
   assert.equal(requests.length, 1); assert.equal(requests[0].name, 'createAccessCode'); assert.equal(requests[0].data.maxUses, 1000);
+  assert.ok(requests[0].data.expiresAtMs > Date.now() + 23 * 3600000);
   const html = text(h.render());
   assert.match(html, /The query requires an index/); assert.doesNotMatch(html, /No codes issued/); assert.match(html, /Access code generated/);
+  assert.match(html, /Six digits/); assert.match(html, /513684/);
+});
+
+test('assigned leaders issue only group codes and lose displayed plaintext when their assignment changes', async () => {
+  const requests = [], reads = [];
+  let assignment = { event, group: { id: 'group', name: 'My group', eventId: 'event' }, loading: false, error: '' };
+  const h = harness('pages/AccessCodesPage.tsx', {
+    '../context/AuthContext': { useSession: () => ({ user: { uid: 'leader' }, role: 'teamLeader', isActive: true }) },
+    '../lib/useAssignedCodeScope': { useAssignedCodeScope: () => assignment },
+    '../lib/records': { useManagedEvents: () => empty, useRecords: (...args) => { reads.push(args); return empty; } },
+    '../lib/management': { callManagement: async (name, data) => { requests.push({ name, data }); return { id: 'hash', code: '000042' }; }, errorMessage: String },
+  });
+  let tree = h.render();
+  assert.doesNotMatch(text(tree), /Event membership \(no group\)/);
+  for (const select of elements(tree).filter(element => element.type === 'select')) assert.equal(select.props.disabled, true);
+  await find(tree, 'form').props.onSubmit({ preventDefault() {}, stopPropagation() {} });
+  assert.equal(requests[0].data.groupId, 'group'); assert.equal(requests[0].data.scope, 'group');
+  assert.ok(reads.some(([name, field, id]) => name === 'accessCodes' && field === 'groupId' && id === 'group'));
+  assert.match(text(h.render()), /000042/);
+  assignment = { loading: false, error: 'Assignment removed.' };
+  tree = h.render(); assert.doesNotMatch(text(tree), /000042/); assert.match(text(tree), /Assignment removed/);
+  const generate = elements(tree).find(element => element.type === 'button' && element.props.children === 'Generate 24-hour code');
+  assert.equal(generate.props.disabled, true);
+  await find(tree, 'form').props.onSubmit({ preventDefault() {}, stopPropagation() {} });
+  assert.equal(requests.length, 1);
+});
+
+test('missing history index selects a scoped fallback instead of blocking code generation', () => {
+  const options = [];
+  const h = harness('pages/AccessCodesPage.tsx', {
+    '../context/AuthContext': { useSession: () => ({ user: { uid: 'owner' }, role: 'organizer', isActive: true }) },
+    '../lib/useAssignedCodeScope': { useAssignedCodeScope: () => ({ loading: false, error: '' }) },
+    '../lib/records': { useManagedEvents: () => ({ ...empty, items: [event] }), useRecords: (collection, field, id, settings) => {
+      if (collection !== 'accessCodes') return empty;
+      options.push({ field, id, ...settings });
+      return { ...empty, error: id && !settings.indexFree ? 'The query requires an index.' : '' };
+    } },
+    '../lib/management': { errorMessage: String },
+  });
+  let tree = h.render();
+  elements(tree).find(element => element.props.name === 'codeEvent').props.onChange({ target: { value: 'event' } });
+  h.render(); h.effects(); tree = h.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(options.at(-1))), { field: 'eventId', id: 'event', indexFree: true });
+  assert.match(text(tree), /index-free pages by code ID/); assert.doesNotMatch(text(tree), /The query requires an index/);
+  h.dispose();
+});
+
+test('new numeric codes retain leading zeros when displayed and copied', async () => {
+  const copied = [];
+  const h = harness('pages/AccessCodesPage.tsx', {
+    '../context/AuthContext': { useSession: () => ({ user: { uid: 'owner' }, role: 'organizer', isActive: true }) },
+    '../lib/useAssignedCodeScope': { useAssignedCodeScope: () => ({ loading: false, error: '' }) },
+    '../lib/records': { useManagedEvents: () => ({ ...empty, items: [event] }), useRecords: () => empty },
+    '../lib/management': { callManagement: async () => ({ id: 'hash', code: '000042' }), errorMessage: String },
+  }, { navigator: { clipboard: { writeText: async code => { copied.push(code); } } } });
+  let tree = h.render();
+  elements(tree).find(element => element.props.name === 'codeEvent').props.onChange({ target: { value: 'event' } });
+  await find(h.render(), 'form').props.onSubmit({ preventDefault() {}, stopPropagation() {} });
+  tree = h.render();
+  assert.match(text(tree), /000042/);
+  await elements(tree).find(element => element.type === 'button' && element.props.children === 'Copy code').props.onClick();
+  assert.deepEqual(copied, ['000042']);
+});
+
+test('old or missing issuance responses require backend deployment and never appear as shareable new codes', async t => {
+  const responses = ['AB12CD', 'ABCD-1234-EFAB-5678-90CD', 'ABCD1234EFAB567890CD'].map(code => ({ id: 'hash', code }));
+  for (const response of [...responses, null, undefined]) {
+    await t.test(response?.code ?? String(response), async () => {
+      const h = harness('pages/AccessCodesPage.tsx', {
+        '../context/AuthContext': { useSession: () => ({ user: { uid: 'owner' }, role: 'organizer', isActive: true }) },
+        '../lib/useAssignedCodeScope': { useAssignedCodeScope: () => ({ loading: false, error: '' }) },
+        '../lib/records': { useManagedEvents: () => ({ ...empty, items: [event] }), useRecords: () => empty },
+        '../lib/management': { callManagement: async () => response, errorMessage: String },
+      });
+      const tree = h.render();
+      elements(tree).find(element => element.props.name === 'codeEvent').props.onChange({ target: { value: 'event' } });
+      await find(h.render(), 'form').props.onSubmit({ preventDefault() {}, stopPropagation() {} });
+      const result = h.render(), html = text(result);
+      assert.match(html, /role="alert"/); assert.match(html, /Backend deployment needed/);
+      assert.match(html, /deploy the updated access-code functions/); assert.match(html, /exactly six digits/);
+      if (response) assert.equal(html.includes(response.code), false);
+      assert.doesNotMatch(html, /Share this code|Copy code|Access code generated/);
+      assert.equal(find(result, 'code'), undefined);
+    });
+  }
+});
+
+test('leader dashboard guard permits only the code route and redirects away from management', () => {
+  const Outlet = () => null, Navigate = () => null;
+  const h = harness('components/RequireManagement.tsx', {
+    '../context/AuthContext': { useSession: () => ({ user: { uid: 'leader' }, role: 'teamLeader', isActive: true, loading: false }) },
+    '../lib/firebase': { auth: {} }, 'firebase/auth': { signOut() {} }, 'react-router-dom': { Outlet, Navigate },
+  });
+  assert.equal(h.render({ accessCodesOnly: true }, h.exports.RequireManagement).type, Outlet);
+  const redirect = h.render({}, h.exports.RequireManagement); assert.equal(redirect.type, Navigate); assert.equal(redirect.props.to, '/access-codes');
+});
+
+test('leader scope verifies both assignment sides, disposes listeners and ignores revoked or late event snapshots', () => {
+  const watches = [];
+  let session = { user: { uid: 'leader' }, role: 'teamLeader', isActive: true, assignedGroupId: 'group' };
+  const h = harness('lib/useAssignedCodeScope.ts', {
+    '../context/AuthContext': { useSession: () => session }, './firebase': { db: {} },
+    'firebase/firestore': { doc: (_db, collection, id) => `${collection}/${id}`, onSnapshot: (ref, next, failed) => {
+      const watch = { ref, next, failed, stopped: false }; watches.push(watch); return () => { watch.stopped = true; };
+    } },
+  });
+  const render = () => h.render(undefined, h.exports.useAssignedCodeScope);
+  const snapshot = (id, data) => ({ id, data: () => data });
+  assert.equal(render().loading, true); h.effects();
+  assert.deepEqual(watches.map(w => w.ref), ['groups/group']);
+  watches[0].next(snapshot('group', { eventId: 'event', leaderUserId: 'someone-else' }));
+  assert.match(render().error, /primary leader/); assert.equal(watches.length, 1);
+  watches[0].next(snapshot('group', { eventId: 'event', leaderUserId: 'leader' }));
+  watches[1].next(snapshot('event', { name: 'Event', status: 'active' }));
+  assert.equal(render().group.id, 'group'); assert.equal(render().event.id, 'event');
+  watches[0].next(snapshot('group', { eventId: 'event', leaderUserId: 'replacement' }));
+  assert.equal(watches[1].stopped, true);
+  watches[1].next(snapshot('event', { name: 'Late event', status: 'active' }));
+  assert.equal(render().group, undefined); assert.match(render().error, /primary leader/);
+  session = { ...session, assignedGroupId: 'new-group' };
+  assert.equal(render().loading, true); assert.equal(render().event, undefined);
+  h.dispose(); assert.equal(watches[0].stopped, true);
 });
 
 test('arrival/index failure never renders a successful empty state', () => {

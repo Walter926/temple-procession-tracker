@@ -64,7 +64,7 @@ class _AccessCodesPanelState extends State<AccessCodesPanel> {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const Text(
-          'Six characters · up to 1000 uses · expires after 24 hours. Copy the new code and share it with intended participants.',
+          'Six digits · up to 1000 uses · expires after 24 hours. Copy the new code and share it with intended participants.',
         ),
         const SizedBox(height: 12),
         FilledButton.icon(

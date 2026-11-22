@@ -8,7 +8,6 @@ import '../map/event_map_screen.dart';
 import 'notification_record.dart';
 
 class NotificationScreen extends StatefulWidget {
-class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -182,6 +181,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     final item = items[index],
                         state = item.effectiveState(DateTime.now());
                     final current = ['active', 'unread'].contains(state);
+                    final statusLabel = current
+                        ? (item.readAt == null ? 'Unread' : 'Read')
+                        : state.toUpperCase();
+                    final createdLabel =
+                        item.createdAt?.toLocal().toString() ??
+                        'Time unavailable';
                     return Card(
                       child: ListTile(
                         enabled: !_busy.contains(item.id),
@@ -202,11 +207,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           ),
                         ),
                         subtitle: Text(
-                          '${item.body}\n${current
-                              ? item.readAt == null
-                                    ? 'Unread'
-                                    : 'Read'
-                              : state.toUpperCase()} · ${item.createdAt?.toLocal().toString() ?? 'Time unavailable'}',
+                          '${item.body}\n$statusLabel · $createdLabel',
                         ),
                         isThreeLine: true,
                         onTap: () => _act(item, () => _open(item)),

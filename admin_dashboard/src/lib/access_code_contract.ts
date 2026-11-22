@@ -8,10 +8,9 @@ export function accessCodeRequest(eventId: string, groupId = '', maxUses = DEFAU
   return { eventId, groupId, scope: groupId ? 'group' as const : 'event' as const, grantedRole: 'teamMember' as const, enabled: true, maxUses, expiresAtMs: Date.now() + CODE_LIFETIME_MS };
 }
 
-export function issuedCodeFormat(code: unknown): 'current' | 'legacy' | undefined {
+export function issuedCodeFormat(code: unknown): 'current' | undefined {
   if (typeof code !== 'string') return;
-  if (/^[A-Z0-9]{6}$/.test(code)) return 'current';
-  if (/^[A-F0-9]{4}(?:-[A-F0-9]{4}){4}$/.test(code) || /^[A-F0-9]{20}$/.test(code)) return 'legacy';
+  if (code.length === 6 && /^[0-9]{6}$/.test(code)) return 'current';
 }
 
 export function accessCodeStatus(code: { enabled: boolean; expiresAt?: { toMillis: () => number }; maxUses?: number; usedCount?: number }, now: number) {

@@ -176,7 +176,7 @@ test('callables reject missing/inactive accounts and cross-owner code management
   await call(codes.revokeAccessCode, f.admin, { id: code.id });
   assert.equal((await read(`accessCodes/${code.id}`)).enabled, false);
   const global = await createCode(f, { eventId: f.foreignEvent, groupId: f.foreignGroup }, f.admin);
-  assert.match(global.code, /^[A-Z0-9]{6}$/);
+  assert.match(global.code, /^[0-9]{6}$/);
 });
 
 test('leader registration grants neither publishing nor code creation until a real assignment', async () => {
@@ -220,11 +220,12 @@ test('registration uses permitted client fields, not caller-forged assignments',
   }));
 });
 
-test('codes are six alphanumeric characters, hashed, reusable within maxUses and fixed at 24 hours despite caller expiry', async () => {
+test('codes are six numeric digits, hashed, reusable within maxUses and fixed at 24 hours despite caller expiry', async () => {
   const f = await fixture(), started = Date.now();
   const result = await createCode(f, { expiresAtMs: Date.now() + 1000, durationHours: 1, maxUses: 2 });
   const finished = Date.now(), stored = await read(`accessCodes/${result.id}`);
-  assert.match(result.code, /^[A-Z0-9]{6}$/);
+  assert.equal(typeof result.code, 'string');
+  assert.match(result.code, /^[0-9]{6}$/);
   assert.match(result.id, /^[a-f0-9]{64}$/);
   assert.equal(result.id, codes.codeHash(result.code));
   assert.equal(stored.code, undefined);
@@ -240,25 +241,32 @@ test('codes are six alphanumeric characters, hashed, reusable within maxUses and
   assert.equal((await byEvent('memberships', f.event)).size, 2);
 });
 
-test('code allocation retries a real storage collision without overwriting the existing code', async t => {
+test('code allocation retries a real storage collision and preserves a leading zero without overwriting the existing code', async t => {
   const f = await fixture(), existing = await createCode(f);
   const original = await read(`accessCodes/${existing.id}`);
-  let fresh;
-  do { fresh = codes.generateCode(); } while ((await db.doc(`accessCodes/${codes.codeHash(fresh)}`).get()).exists);
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', values = [...existing.code, ...fresh].map(character => alphabet.indexOf(character));
+  let freshNumber = 41, fresh;
+  do {
+    fresh = String(++freshNumber).padStart(6, '0');
+  } while ((await db.doc(`accessCodes/${codes.codeHash(fresh)}`).get()).exists);
+  assert.ok(freshNumber < 100000, 'fixture must retain a leading zero');
+  const values = [Number(existing.code), freshNumber];
   let index = 0;
   // Control only entropy, not generateCode or the allocator under test.
   const random = t.mock.method(require('node:crypto'), 'randomInt', maximum => {
-    assert.equal(maximum, 36);
+    assert.equal(maximum, 1_000_000);
     assert.ok(index < values.length, 'allocator should retry once then succeed');
     return values[index++];
   });
   const allocated = await createCode(f);
   assert.equal(allocated.code, fresh);
+  assert.match(allocated.code, /^0[0-9]{5}$/);
+  assert.equal(allocated.id, codes.codeHash(fresh));
   assert.notEqual(allocated.id, existing.id);
-  assert.equal(random.mock.callCount(), 12);
+  assert.equal(random.mock.callCount(), 2);
   assert.deepEqual(await read(`accessCodes/${existing.id}`), original);
   assert.equal((await byEvent('accessCodes', f.event)).size, 2);
+  await call(codes.redeemAccessCode, f.member, { code: allocated.code });
+  assert.equal((await read(`accessCodes/${allocated.id}`)).usedCount, 1);
 });
 
 test('simultaneous duplicate redemptions and different members preserve one membership and exact group/code counts', { timeout: 60000 }, async () => {

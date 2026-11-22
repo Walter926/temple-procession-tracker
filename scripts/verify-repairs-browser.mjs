@@ -152,7 +152,7 @@ try {
   const codeResponse = await newCode;
   assert.equal(codeResponse.status(), 200);
   const issued = (await codeResponse.json()).result;
-  assert.match(issued.code, /^[A-Z0-9]{6}$/);
+  assert.match(issued.code, /^[0-9]{6}$/);
   const storedCode = (await db.doc(`accessCodes/${issued.id}`).get()).data();
   assert.equal(storedCode.maxUses, 1000);
   assert.equal(storedCode.expiresAt.toMillis(), issued.expiresAtMs);
