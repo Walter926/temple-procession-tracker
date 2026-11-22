@@ -58,9 +58,15 @@ void main() {
     );
   });
   test(
-    'event creation sends an integer default of 1000 and uses server expiry',
+    'event creation sends integer defaults with 24-hour expiry and uses server expiry',
     () async {
+      final earliestExpiry = DateTime.now()
+          .add(const Duration(hours: 24))
+          .millisecondsSinceEpoch;
       final issued = await service.generate(eventId: 'event');
+      final latestExpiry = DateTime.now()
+          .add(const Duration(hours: 24))
+          .millisecondsSinceEpoch;
       final (name, payload) = functions.calls.single;
       expect(name, 'createAccessCode');
       expect(payload, {
@@ -70,8 +76,13 @@ void main() {
         'grantedRole': 'teamMember',
         'enabled': true,
         'maxUses': 1000,
+        'expiresAtMs': isA<int>(),
       });
       expect(payload['maxUses'], isA<int>());
+      expect(
+        payload['expiresAtMs'],
+        inInclusiveRange(earliestExpiry, latestExpiry),
+      );
       expect(
         issued.expiresAt!.millisecondsSinceEpoch,
         functions.response['expiresAtMs'],
@@ -83,18 +94,63 @@ void main() {
     'group creation preserves group scope and both supported bounds',
     () async {
       for (final uses in [1, 1000]) {
+        final earliestExpiry = DateTime.now()
+            .add(const Duration(hours: 24))
+            .millisecondsSinceEpoch;
         await service.generate(
           eventId: 'event',
           groupId: 'group',
           maxUses: uses,
         );
+        final latestExpiry = DateTime.now()
+            .add(const Duration(hours: 24))
+            .millisecondsSinceEpoch;
         final payload = functions.calls.last.$2;
         expect(payload['scope'], 'group');
         expect(payload['groupId'], 'group');
         expect(payload['maxUses'], uses);
+        expect(payload['expiresAtMs'], isA<int>());
+        expect(
+          payload['expiresAtMs'],
+          inInclusiveRange(earliestExpiry, latestExpiry),
+        );
       }
     },
   );
+  test(
+    'legacy creation retains the returned code without a returned expiry',
+    () async {
+      functions.response = {'id': 'hash', 'code': 'ABCD-EF12-1234-5678-9012'};
+      final issued = await service.generate(eventId: 'event');
+      expect(issued.id, 'hash');
+      expect(issued.code, 'ABCD-EF12-1234-5678-9012');
+      expect(issued.expiresAt, isNull);
+    },
+  );
+  test('malformed creation responses are rejected', () async {
+    final valid = Map<String, dynamic>.of(functions.response);
+    for (final response in <Map<String, dynamic>>[
+      {'code': 'AB12C3'},
+      {...valid, 'id': 17},
+      {...valid, 'id': ' '},
+      {...valid, 'code': null},
+      {...valid, 'code': 'invalid'},
+      {...valid, 'expiresAtMs': '1795000000000'},
+      {...valid, 'expiresAtMs': double.nan},
+      {...valid, 'expiresAtMs': double.infinity},
+      {...valid, 'expiresAtMs': 1795000000000.5},
+      {...valid, 'expiresAtMs': 0},
+      {...valid, 'expiresAtMs': 8640000000000001},
+    ]) {
+      functions.response = response;
+      await expectLater(service.generate(eventId: 'event'), throwsStateError);
+    }
+  });
+  test('creation accepts an integral numeric server expiry', () async {
+    functions.response['expiresAtMs'] = 1795000000000.0;
+    final issued = await service.generate(eventId: 'event');
+    expect(issued.expiresAt!.millisecondsSinceEpoch, 1795000000000);
+  });
   test('invalid maximum uses never reach the callable', () async {
     for (final uses in [-1, 0, 1001]) {
       await expectLater(

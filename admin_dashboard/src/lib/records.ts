@@ -10,10 +10,10 @@ import type { RecordsState } from './record_pager';
 export type Stored<T> = T & { id: string };
 
 export function useRecords<T>(collectionName: string, requestedField?: string, requestedEquals?: string, options: RecordsOptions = {}) {
-  const { user, role, isActive } = useSession();
-  const uid = user?.uid, status = options.status;
-  const plan = useMemo(() => recordsPlan(collectionName, { uid, role, isActive }, requestedField, requestedEquals, { status }),
-    [collectionName, uid, role, isActive, requestedField, requestedEquals, status]);
+  const { user, role, isActive, assignedGroupId } = useSession();
+  const uid = user?.uid, status = options.status, indexFree = options.indexFree;
+  const plan = useMemo(() => recordsPlan(collectionName, { uid, role, isActive, assignedGroupId }, requestedField, requestedEquals, { status, indexFree }),
+    [collectionName, uid, role, isActive, assignedGroupId, requestedField, requestedEquals, status, indexFree]);
   const { key, enabled } = plan;
   const [state, setState] = useState<RecordsState<Stored<T>> & { identity?: RecordsPlan }>({ items: [], loading: true, loadingMore: false, error: '', hasMore: false });
   const pagerRef = useRef<{ key: string; pager: ReturnType<typeof firestoreRecordPager<T>> } | undefined>(undefined);

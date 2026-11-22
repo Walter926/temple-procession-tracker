@@ -33,8 +33,8 @@ export default function LoginPage() {
     }
   }
 
-  if (!loading && user && isActive && (role === 'admin' || role === 'organizer')) {
-    return <Navigate to="/events" replace />;
+  if (!loading && user && isActive && ['admin', 'organizer', 'teamLeader'].includes(role ?? '')) {
+    return <Navigate to={role === 'teamLeader' ? '/access-codes' : '/events'} replace />;
   }
 
   return (
@@ -60,7 +60,7 @@ export default function LoginPage() {
           {busy ? 'Signing in...' : 'Sign In'}
         </button>
 
-        {user && !loading && (!isActive || (role !== 'admin' && role !== 'organizer')) && (
+        {user && !loading && (!isActive || !['admin', 'organizer', 'teamLeader'].includes(role ?? '')) && (
           <>
             <p className="error">This account is inactive or has no dashboard access.</p>
             <button type="button" onClick={() => void signOut(auth)}>Sign Out</button>

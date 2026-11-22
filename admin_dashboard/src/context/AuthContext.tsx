@@ -3,12 +3,13 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
-interface SessionState { user: User | null; role: string | null; isActive: boolean; loading: boolean; error: string | null }
-const AuthContext = createContext<SessionState>({ user: null, role: null, isActive: false, loading: true, error: null });
+interface SessionState { user: User | null; role: string | null; assignedGroupId: string; isActive: boolean; loading: boolean; error: string | null }
+const AuthContext = createContext<SessionState>({ user: null, role: null, assignedGroupId: '', isActive: false, loading: true, error: null });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [assignedGroupId, setAssignedGroupId] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stopProfile = undefined;
       setUser(nextUser);
       setRole(null);
+      setAssignedGroupId('');
       setIsActive(false);
       setError(null);
       if (!nextUser) { setLoading(false); return; }
@@ -27,14 +29,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stopProfile = onSnapshot(doc(db, 'users', nextUser.uid), (snapshot) => {
         const data = snapshot.data();
         setRole(typeof data?.role === 'string' ? data.role : null);
-        setIsActive(data?.isActive === true);
+        setAssignedGroupId(typeof data?.assignedGroupId === 'string' ? data.assignedGroupId : '');
+        setIsActive(data?.isActive === true && data?.deleting !== true);
         setLoading(false);
-      }, (reason) => { setRole(null); setIsActive(false); setError(reason.message); setLoading(false); });
-    }, (reason) => { setRole(null); setIsActive(false); setError(reason.message); setLoading(false); });
+      }, (reason) => { setRole(null); setAssignedGroupId(''); setIsActive(false); setError(reason.message); setLoading(false); });
+    }, (reason) => { setRole(null); setAssignedGroupId(''); setIsActive(false); setError(reason.message); setLoading(false); });
     return () => { stopProfile?.(); stopAuth(); };
   }, []);
 
-  return <AuthContext.Provider value={{ user, role, isActive, loading, error }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, role, assignedGroupId, isActive, loading, error }}>{children}</AuthContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

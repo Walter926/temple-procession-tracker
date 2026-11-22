@@ -24,7 +24,6 @@ export default function App() {
       <Route path="/routes" element={<RoutesPage />} />
       <Route path="/stop-points" element={<StopPointsPage />} />
       <Route path="/groups" element={<GroupsPage />} />
-      <Route path="/access-codes" element={<AccessCodesPage />} />
       <Route path="/announcements" element={<AnnouncementsPage />} />
       <Route path="/live-map" element={<LiveMapPage />} />
       <Route path="/live-map" element={<LiveMapPage />} />
@@ -32,6 +31,9 @@ export default function App() {
       <Route path="/users" element={<UsersPage />} />
       <Route path="/route-suggestions" element={<RouteSuggestionsPage />} />
       <Route path="/settings" element={<Navigate to="/events" replace />} />
+    </Route></Route>
+    <Route element={<RequireManagement accessCodesOnly />}><Route element={<DashboardLayout />}>
+      <Route path="/access-codes" element={<AccessCodesPage />} />
     </Route></Route>
     <Route path="*" element={<Navigate to="/events" replace />} />
   </Routes></Suspense>;

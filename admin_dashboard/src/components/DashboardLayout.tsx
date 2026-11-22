@@ -13,7 +13,7 @@ export default function DashboardLayout() {
   const { user, role } = useSession();
   return <div className="layout"><a className="skip-link" href="#main-content">Skip to content</a><aside className="sidebar">
     <div className="brand"><img className="brand-logo" src="/temple-icon.png" alt="" /><div><h2>Temple Tracker</h2><p className="subtle">Management</p></div></div>
-    <nav aria-label="Management navigation">{pages.filter(page => page.to !== '/users' || role === 'admin').map(page => <NavLink key={page.to} to={page.to} className={({ isActive }) => isActive ? 'active' : ''}>{page.label}</NavLink>)}</nav>
+    <nav aria-label="Management navigation">{pages.filter(page => role === 'teamLeader' ? page.to === '/access-codes' : page.to !== '/users' || role === 'admin').map(page => <NavLink key={page.to} to={page.to} className={({ isActive }) => isActive ? 'active' : ''}>{page.label}</NavLink>)}</nav>
   </aside><div className="workspace"><header className="topbar"><span>{user?.email} <span className="badge">{role}</span></span><button onClick={() => void signOut(auth)}>Sign out</button></header>
     <main id="main-content" className="content" tabIndex={-1}><Outlet /></main></div></div>;
 }

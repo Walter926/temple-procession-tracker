@@ -52,14 +52,31 @@ class AccessCodeService {
           'grantedRole': 'teamMember',
           'enabled': true,
           'maxUses': maxUses,
+          // Older deployed functions require this; current functions own expiry.
+          'expiresAtMs': DateTime.now()
+              .add(const Duration(hours: 24))
+              .millisecondsSinceEpoch,
         });
+    final id = result.data['id'];
+    final code = result.data['code'];
+    final expiresAtMs = result.data['expiresAtMs'];
+    if (id is! String ||
+        id.trim().isEmpty ||
+        code is! String ||
+        !isValidFormat(code) ||
+        (expiresAtMs != null &&
+            (expiresAtMs is! num ||
+                !expiresAtMs.isFinite ||
+                expiresAtMs <= 0 ||
+                expiresAtMs > 8640000000000000 ||
+                expiresAtMs % 1 != 0))) {
+      throw StateError('The server returned an invalid access code.');
+    }
     return IssuedAccessCode(
-      id: result.data['id'] as String,
-      code: result.data['code'] as String,
-      expiresAt: result.data['expiresAtMs'] is num
-          ? DateTime.fromMillisecondsSinceEpoch(
-              (result.data['expiresAtMs'] as num).toInt(),
-            )
+      id: id,
+      code: code,
+      expiresAt: expiresAtMs is num
+          ? DateTime.fromMillisecondsSinceEpoch(expiresAtMs.toInt())
           : null,
     );
   }
